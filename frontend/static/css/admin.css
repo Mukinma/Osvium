@@ -499,7 +499,11 @@ hr.separator, .separator {
   gap: 10px;
 }
 .resumen-metric {
-  display: flex; flex-direction: column; gap: 10px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 18px;
   width: 100%;
   background: rgba(12, 18, 29, 0.78);
@@ -508,14 +512,15 @@ hr.separator, .separator {
   box-shadow: inset 0 0 24px rgba(40, 80, 130, 0.08);
 }
 .resumen-metric-sparkline {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-    width: 90px;
-    height: 36px;
-    opacity: 0.35;
-    overflow: hidden;
-    pointer-events: none;
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
+  width: 110px;
+  height: 28px;
+  opacity: 0.9;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
 }
 .resumen-metric-sparkline__svg {
   width: 100%;
@@ -523,8 +528,9 @@ hr.separator, .separator {
 }
 .resumen-metric-sparkline__path {
   fill: none;
-  stroke-width: 1.5;
-  opacity: 0.7;
+  stroke: rgba(96, 165, 250, 0.95);
+  stroke-width: 2;
+  opacity: 0.85;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -2283,7 +2289,7 @@ input[type="number"]::-webkit-outer-spin-button { opacity: 0.4; margin-right: 6p
   color: rgba(225,238,255,0.7);
   line-height: 1.2;
 }
-.settings-segment__desc {
+.settings-segment__esc {
   font-size: 11px;
   color: rgba(183,239,255,0.4);
   line-height: 1.2;
