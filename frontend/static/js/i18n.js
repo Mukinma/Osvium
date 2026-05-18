@@ -139,6 +139,8 @@
     'Usuario': 'Username',
     'Contraseña': 'Password',
     'Entrar': 'Sign in',
+    '¿Olvidaste tu contraseña? Llama al <span class="login-recover__phone">314 161 1779</span> para recuperarla.':
+      'Forgot your password? Call <span class="login-recover__phone">314 161 1779</span> to recover it.',
 
     /* ──────────────────────────────────────────────
        Admin — sidebar + topbar

@@ -410,6 +410,24 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
+/* ── Recovery hint (decorative, no functionality) ──── */
+.login-recover {
+  margin-top: 16px;
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+}
+
+.login-recover__phone {
+  color: #7aa6ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: default;
+}
+
 /* ── LIGHT THEME ────────────────────────────────────── */
 html.theme-light .centered-body {
   background: #dae8f0;
@@ -539,6 +557,14 @@ html.theme-light .login-submit:hover {
   box-shadow:
     0 6px 26px rgba(15, 30, 65, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+html.theme-light .login-recover {
+  color: rgba(10, 30, 60, 0.42);
+}
+
+html.theme-light .login-recover__phone {
+  color: #3b6fc2;
 }
 
 /* ── MOBILE / TOUCH ─────────────────────────────────── */
@@ -700,6 +726,7 @@ html.theme-light .login-submit:hover {
 body.login-access-granted .login-head > div:last-child,
 body.login-access-granted .field-group,
 body.login-access-granted .login-actions,
+body.login-access-granted .login-recover,
 body.login-access-granted .login-error,
 body.login-access-granted .hud-tl,
 body.login-access-granted .hud-tr,
