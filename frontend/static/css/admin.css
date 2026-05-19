@@ -517,34 +517,50 @@ hr.separator, .separator {
   bottom: 12px;
   width: 110px;
   height: 28px;
-  opacity: 0.9;
-  overflow: visible;
+  opacity: 0.92;
+  overflow: hidden;
   pointer-events: none;
   z-index: 1;
 }
 .resumen-metric-sparkline__svg {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
 }
 .resumen-metric-sparkline__path {
   fill: none;
-  stroke: rgba(96, 165, 250, 0.95);
-  stroke-width: 2;
-  opacity: 0.85;
+  stroke: rgba(91, 164, 244, 0.94);
+  stroke-width: 1.65;
+  opacity: 0.92;
   stroke-linecap: round;
   stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(91, 164, 244, 0.18));
 }
 .resumen-metric--accent .resumen-metric-sparkline__path {
-  stroke: rgba(110, 231, 183, 0.95);
-  filter: drop-shadow(0 0 10px rgba(110, 231, 183, 0.3));
+  stroke: rgba(74, 222, 128, 0.96);
+  filter: drop-shadow(0 0 4px rgba(74, 222, 128, 0.2));
 }
 .resumen-metric-sparkline::before {
   content: '';
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 5px;
+  height: 1px;
   pointer-events: none;
-  background: radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.14), transparent 35%),
-              radial-gradient(circle at 80% 80%, rgba(129, 140, 248, 0.1), transparent 28%);
+  background: rgba(148, 163, 184, 0.16);
+}
+.resumen-metric-sparkline::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  width: 1px;
+  height: 5px;
+  pointer-events: none;
+  background: rgba(148, 163, 184, 0.2);
+  box-shadow: -109px 0 0 rgba(148, 163, 184, 0.12);
 }
 .resumen-metric__value {
   font-size: clamp(30px, 5vw, 48px); font-weight: 700;
