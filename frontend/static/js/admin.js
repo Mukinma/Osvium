@@ -71,7 +71,6 @@ const statManual = document.getElementById('statManual');
 
 const resumenHero = document.getElementById('resumenHero');
 const resumenStatusChip = document.getElementById('resumenStatusChip');
-const resumenStatusLabel = document.getElementById('resumenStatusLabel');
 const resumenStatusTitle = document.getElementById('resumenStatusTitle');
 const resumenPillCameraState = document.getElementById('resumenPillCameraState');
 const resumenPillModelState = document.getElementById('resumenPillModelState');
@@ -905,7 +904,6 @@ function computeResumenModel(users, logs, status) {
     alertState,
     tone,
     statusChipText,
-    heroLabel: tr('Estado del sistema'),
     heroHeadline,
     pillCamera: buildResumenPillCamera(status),
     pillModel: buildResumenPillModel(status),
@@ -1007,7 +1005,6 @@ function renderResumen(model) {
   resumenHero.classList.toggle('has-inline-alert', Boolean(alertCopy.visible));
 
   if (resumenStatusChip) resumenStatusChip.textContent = model.statusChipText;
-  if (resumenStatusLabel) resumenStatusLabel.textContent = model.heroLabel;
   if (resumenStatusTitle) resumenStatusTitle.textContent = model.heroHeadline;
   applyResumenPillState(resumenPillCameraState, model.pillCamera);
   applyResumenPillState(resumenPillModelState, model.pillModel);
