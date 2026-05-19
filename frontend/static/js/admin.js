@@ -736,8 +736,8 @@ function buildSparklinePath(values, min, max) {
 
 function updateSparklineHistory(history, target, min, max) {
   const last = history.length ? history[history.length - 1] : target;
-  const drift = (target - last) * 0.24;
-  const noise = (Math.random() - 0.5) * Math.max(1, (max - min) * 0.12);
+  const drift = (target - last) * 0.32;
+  const noise = (Math.random() - 0.5) * Math.max(0.35, (max - min) * 0.035);
   const next = clamp(last + drift + noise, min, max);
   history.push(next);
   return history;
