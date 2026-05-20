@@ -70,7 +70,6 @@ const statDenied = document.getElementById('statDenied');
 const statManual = document.getElementById('statManual');
 
 const resumenHero = document.getElementById('resumenHero');
-const resumenStatusChip = document.getElementById('resumenStatusChip');
 const resumenStatusLabel = document.getElementById('resumenStatusLabel');
 const resumenStatusTitle = document.getElementById('resumenStatusTitle');
 const resumenPillCameraState = document.getElementById('resumenPillCameraState');
@@ -890,10 +889,6 @@ function computeResumenModel(users, logs, status) {
       : tr('Sistema listo');
 
   const tone = alertState === 'critical' ? 'critical' : ((alertState === 'warning' || isOnboarding) ? 'warning' : 'ok');
-  const statusChipText = alertState === 'critical'
-    ? tr('Critico')
-    : (alertState === 'warning' ? tr('Vigilar') : (isOnboarding ? tr('Preparacion') : tr('Estable')));
-
   return {
     status,
     doorState,
@@ -904,7 +899,6 @@ function computeResumenModel(users, logs, status) {
     isOnboarding,
     alertState,
     tone,
-    statusChipText,
     heroLabel: tr('Estado del sistema'),
     heroHeadline,
     pillCamera: buildResumenPillCamera(status),
@@ -1006,7 +1000,6 @@ function renderResumen(model) {
   resumenHero.classList.add(`is-${model.tone}`);
   resumenHero.classList.toggle('has-inline-alert', Boolean(alertCopy.visible));
 
-  if (resumenStatusChip) resumenStatusChip.textContent = model.statusChipText;
   if (resumenStatusLabel) resumenStatusLabel.textContent = model.heroLabel;
   if (resumenStatusTitle) resumenStatusTitle.textContent = model.heroHeadline;
   applyResumenPillState(resumenPillCameraState, model.pillCamera);
@@ -1018,13 +1011,13 @@ function renderResumen(model) {
 
   if (resumenMetricActiveUsers) resumenMetricActiveUsers.textContent = model.activeUsers;
   if (resumenMetricToday) resumenMetricToday.textContent = model.todayTotal;
-  if (resumenMetricSuccess) resumenMetricSuccess.textContent = formatPercent(model.successRateToday);
-  if (resumenMetricManual) resumenMetricManual.textContent = model.todayManual;
+  if (resumenMetricSuccess) resumenMetricSuccess.textContent = model.todayGranted;
+  if (resumenMetricManual) resumenMetricManual.textContent = model.todayDenied;
 
   renderResumenSparkline(resumenMetricActiveUsersGraph, resumenSparklineState.activeUsers, model.activeUsers, resumenSparklineConfig.activeUsers);
   renderResumenSparkline(resumenMetricTodayGraph, resumenSparklineState.today, model.todayTotal, resumenSparklineConfig.today);
-  renderResumenSparkline(resumenMetricSuccessGraph, resumenSparklineState.success, Math.round((model.successRateToday ?? 0) * 100), resumenSparklineConfig.success);
-  renderResumenSparkline(resumenMetricManualGraph, resumenSparklineState.manual, model.todayManual, resumenSparklineConfig.manual);
+  renderResumenSparkline(resumenMetricSuccessGraph, resumenSparklineState.success, model.todayGranted, resumenSparklineConfig.success);
+  renderResumenSparkline(resumenMetricManualGraph, resumenSparklineState.manual, model.todayDenied, resumenSparklineConfig.manual);
 
   renderResumenActions(model.actionPlan);
   resumenHero.closest('.resumen-layout')?.classList.add('is-live');

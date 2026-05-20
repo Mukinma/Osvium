@@ -44,7 +44,6 @@
             <span class="hud-corner hud-br" aria-hidden="true"></span>
             <div class="resumen-hero__topline">
               <span class="resumen-hero__eyebrow" data-i18n>Centro de control</span>
-              <span class="resumen-status-chip" id="resumenStatusChip" data-i18n>Monitoreando</span>
             </div>
 
             <div class="resumen-hero__copy">
@@ -81,36 +80,56 @@
             </div>
 
             <div class="resumen-metric-strip" aria-label="Indicadores operativos" data-i18n-attr="aria-label:Indicadores operativos">
-              <article class="resumen-metric">
-                <span class="resumen-metric__value" id="resumenMetricActiveUsers">—</span>
-                <span class="resumen-metric__label" data-i18n>Personas activas</span>
+              <article class="resumen-metric resumen-metric--people">
+                <span class="resumen-metric__icon" aria-hidden="true">
+                  <svg class="icon"><use href="/static/icons/lucide/lucide-sprite.svg#user"></use></svg>
+                </span>
+                <span class="resumen-metric__copy">
+                  <span class="resumen-metric__value" id="resumenMetricActiveUsers">—</span>
+                  <span class="resumen-metric__label" data-i18n>Personas activas</span>
+                </span>
                 <div class="resumen-metric-sparkline" aria-hidden="true">
                   <svg class="resumen-metric-sparkline__svg" viewBox="0 0 100 30" preserveAspectRatio="none">
                     <path class="resumen-metric-sparkline__path" id="resumenMetricActiveUsersGraph" d="M0,20 L100,20"></path>
                   </svg>
                 </div>
               </article>
-              <article class="resumen-metric">
-                <span class="resumen-metric__value" id="resumenMetricToday">—</span>
-                <span class="resumen-metric__label" data-i18n>Actividad hoy</span>
+              <article class="resumen-metric resumen-metric--access">
+                <span class="resumen-metric__icon" aria-hidden="true">
+                  <svg class="icon"><use href="/static/icons/lucide/lucide-sprite.svg#unlock"></use></svg>
+                </span>
+                <span class="resumen-metric__copy">
+                  <span class="resumen-metric__value" id="resumenMetricToday">—</span>
+                  <span class="resumen-metric__label" data-i18n>Accesos hoy</span>
+                </span>
                 <div class="resumen-metric-sparkline" aria-hidden="true">
                   <svg class="resumen-metric-sparkline__svg" viewBox="0 0 100 30" preserveAspectRatio="none">
                     <path class="resumen-metric-sparkline__path" id="resumenMetricTodayGraph" d="M0,20 L100,20"></path>
                   </svg>
                 </div>
               </article>
-              <article class="resumen-metric resumen-metric--accent">
-                <span class="resumen-metric__value" id="resumenMetricSuccess">—</span>
-                <span class="resumen-metric__label" data-i18n>Tasa de reconocimiento</span>
+              <article class="resumen-metric resumen-metric--recognized">
+                <span class="resumen-metric__icon" aria-hidden="true">
+                  <svg class="icon"><use href="/static/icons/lucide/lucide-sprite.svg#check"></use></svg>
+                </span>
+                <span class="resumen-metric__copy">
+                  <span class="resumen-metric__value" id="resumenMetricSuccess">—</span>
+                  <span class="resumen-metric__label" data-i18n>Reconocidos</span>
+                </span>
                 <div class="resumen-metric-sparkline" aria-hidden="true">
                   <svg class="resumen-metric-sparkline__svg" viewBox="0 0 100 30" preserveAspectRatio="none">
                     <path class="resumen-metric-sparkline__path" id="resumenMetricSuccessGraph" d="M0,20 L100,20"></path>
                   </svg>
                 </div>
               </article>
-              <article class="resumen-metric">
-                <span class="resumen-metric__value" id="resumenMetricManual">—</span>
-                <span class="resumen-metric__label" data-i18n>Manuales hoy</span>
+              <article class="resumen-metric resumen-metric--blocked">
+                <span class="resumen-metric__icon" aria-hidden="true">
+                  <svg class="icon"><use href="/static/icons/lucide/lucide-sprite.svg#shield"></use></svg>
+                </span>
+                <span class="resumen-metric__copy">
+                  <span class="resumen-metric__value" id="resumenMetricManual">—</span>
+                  <span class="resumen-metric__label" data-i18n>Bloqueados</span>
+                </span>
                 <div class="resumen-metric-sparkline" aria-hidden="true">
                   <svg class="resumen-metric-sparkline__svg" viewBox="0 0 100 30" preserveAspectRatio="none">
                     <path class="resumen-metric-sparkline__path" id="resumenMetricManualGraph" d="M0,20 L100,20"></path>
