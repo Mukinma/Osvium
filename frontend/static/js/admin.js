@@ -1015,13 +1015,13 @@ function renderResumen(model) {
 
   if (resumenMetricActiveUsers) resumenMetricActiveUsers.textContent = model.activeUsers;
   if (resumenMetricToday) resumenMetricToday.textContent = model.todayTotal;
-  if (resumenMetricSuccess) resumenMetricSuccess.textContent = formatPercent(model.successRateToday);
-  if (resumenMetricManual) resumenMetricManual.textContent = model.todayManual;
+  if (resumenMetricSuccess) resumenMetricSuccess.textContent = model.todayGranted;
+  if (resumenMetricManual) resumenMetricManual.textContent = model.todayDenied;
 
   renderResumenSparkline(resumenMetricActiveUsersGraph, resumenSparklineState.activeUsers, model.activeUsers, resumenSparklineConfig.activeUsers);
   renderResumenSparkline(resumenMetricTodayGraph, resumenSparklineState.today, model.todayTotal, resumenSparklineConfig.today);
-  renderResumenSparkline(resumenMetricSuccessGraph, resumenSparklineState.success, Math.round((model.successRateToday ?? 0) * 100), resumenSparklineConfig.success);
-  renderResumenSparkline(resumenMetricManualGraph, resumenSparklineState.manual, model.todayManual, resumenSparklineConfig.manual);
+  renderResumenSparkline(resumenMetricSuccessGraph, resumenSparklineState.success, model.todayGranted, resumenSparklineConfig.success);
+  renderResumenSparkline(resumenMetricManualGraph, resumenSparklineState.manual, model.todayDenied, resumenSparklineConfig.manual);
 
   renderResumenActions(model.actionPlan);
   resumenHero.closest('.resumen-layout')?.classList.add('is-live');
