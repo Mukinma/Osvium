@@ -8,9 +8,9 @@
 
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 
-  padding: 6px 10px 6px 6px;
+  padding: 10px 16px 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
 
@@ -20,7 +20,7 @@
 
   color: #f4f6fb;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -51,8 +51,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   color: #f4f6fb;
   opacity: 0.92;
 }
@@ -67,17 +67,18 @@
   line-height: 1;
 }
 
-/* Portrait 720x1280 — mantener el botón dentro del área segura */
+/* Portrait 720x1280 — botón grande para touch en kiosk */
 @media (max-width: 800px) {
   .i18n-toggle {
     top: 12px;
     right: 12px;
-    padding: 5px 9px 5px 5px;
-    font-size: 11px;
+    padding: 14px 24px 14px 18px;
+    gap: 12px;
+    font-size: 22px;
   }
   .i18n-toggle__icon {
-    width: 16px;
-    height: 16px;
+    width: 28px;
+    height: 28px;
   }
 }
 

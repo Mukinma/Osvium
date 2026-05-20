@@ -249,8 +249,8 @@
 }
 
 .kiosk-header__logo {
-  width: 48px;
-  height: 48px;
+  width: 58px;
+  height: 58px;
   object-fit: contain;
   opacity: 0.92;
 }
@@ -262,7 +262,7 @@
 }
 
 .kiosk-header__text strong {
-  font-size: 2rem;
+  font-size: 3.6rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   line-height: 1;
