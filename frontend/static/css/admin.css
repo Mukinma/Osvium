@@ -430,10 +430,24 @@ hr.separator, .separator {
   font-size: 12px; font-weight: 600; letter-spacing: 0.14em;
   text-transform: uppercase; color: rgba(255, 255, 255, 0.28); margin: 0;
 }
+.resumen-hero__title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 14px;
+}
 .resumen-hero__title {
   font-size: clamp(26px, 5vw, 38px); font-weight: 700;
   color: rgba(225, 238, 255, 0.97); letter-spacing: -0.015em;
-  line-height: 1.15; margin: 8px 0 14px;
+  line-height: 1.15; margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.resumen-hero__face-scan {
+  width: clamp(56px, 14vw, 80px);
+  height: auto;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .resumen-sys-pills {
@@ -528,15 +542,17 @@ hr.separator, .separator {
   height: 24px;
   stroke-width: 1.8;
 }
-.resumen-metric--people .resumen-metric__icon,
+.resumen-metric--people .resumen-metric__icon {
+  color: #5ba4f4;
+}
+.resumen-metric--access .resumen-metric__icon {
+  color: #4ade80;
+}
 .resumen-metric--recognized .resumen-metric__icon {
   color: #4ade80;
 }
-.resumen-metric--access .resumen-metric__icon {
-  color: #5ba4f4;
-}
 .resumen-metric--blocked .resumen-metric__icon {
-  color: #fbbf24;
+  color: #f87171;
 }
 .resumen-metric__copy {
   position: relative;
