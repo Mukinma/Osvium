@@ -70,7 +70,7 @@ const statDenied = document.getElementById('statDenied');
 const statManual = document.getElementById('statManual');
 
 const resumenHero = document.getElementById('resumenHero');
-const resumenStatusLabel = document.getElementById('resumenStatusLabel');
+const resumenStatusChip = document.getElementById('resumenStatusChip');
 const resumenStatusTitle = document.getElementById('resumenStatusTitle');
 const resumenPillCameraState = document.getElementById('resumenPillCameraState');
 const resumenPillModelState = document.getElementById('resumenPillModelState');
@@ -889,6 +889,10 @@ function computeResumenModel(users, logs, status) {
       : tr('Sistema listo');
 
   const tone = alertState === 'critical' ? 'critical' : ((alertState === 'warning' || isOnboarding) ? 'warning' : 'ok');
+  const statusChipText = alertState === 'critical'
+    ? tr('Critico')
+    : (alertState === 'warning' ? tr('Vigilar') : (isOnboarding ? tr('Preparacion') : tr('Estable')));
+
   return {
     status,
     doorState,
@@ -899,7 +903,7 @@ function computeResumenModel(users, logs, status) {
     isOnboarding,
     alertState,
     tone,
-    heroLabel: tr('Estado del sistema'),
+    statusChipText,
     heroHeadline,
     pillCamera: buildResumenPillCamera(status),
     pillModel: buildResumenPillModel(status),
@@ -1000,7 +1004,7 @@ function renderResumen(model) {
   resumenHero.classList.add(`is-${model.tone}`);
   resumenHero.classList.toggle('has-inline-alert', Boolean(alertCopy.visible));
 
-  if (resumenStatusLabel) resumenStatusLabel.textContent = model.heroLabel;
+  if (resumenStatusChip) resumenStatusChip.textContent = model.statusChipText;
   if (resumenStatusTitle) resumenStatusTitle.textContent = model.heroHeadline;
   applyResumenPillState(resumenPillCameraState, model.pillCamera);
   applyResumenPillState(resumenPillModelState, model.pillModel);
