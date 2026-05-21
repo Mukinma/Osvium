@@ -2344,17 +2344,17 @@ input[type="number"]::-webkit-outer-spin-button { opacity: 0.4; margin-right: 6p
   box-shadow: inset 0 0 0 1px rgba(183,239,255,0.25);
 }
 .settings-segment__btn[aria-pressed="true"] .settings-segment__name {
-  color: #b7efff;
+  color: #ffffff;
 }
 .settings-segment__name {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(225,238,255,0.7);
+  color: #ffffff;
   line-height: 1.2;
 }
-.settings-segment__esc {
+.settings-segment__desc {
   font-size: 11px;
-  color: rgba(183,239,255,0.4);
+  color: rgba(225,238,255,0.7);
   line-height: 1.2;
 }
 
