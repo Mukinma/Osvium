@@ -102,7 +102,7 @@
       <span class="enroll-hud-label" data-i18n>Registro facial</span>
       <div class="enroll-hud-right">
         <span class="enroll-user-chip" id="enrollUserMeta">—</span>
-        <span class="enroll-total-chip" id="enrollSummaryTotal">0 / 35</span>
+        <span class="enroll-total-chip" id="enrollSummaryTotal">0 / 20</span>
       </div>
     </div>
 
@@ -122,7 +122,7 @@
       <div class="enroll-vp-hud" id="enrollHud" aria-live="polite">
         <div class="enroll-vp-topline">
           <span class="enrollment-step-badge" id="enrollStepBadge" data-i18n>Preparando</span>
-          <span class="enroll-vp-counter" id="enrollStepCounter">0 / 35</span>
+          <span class="enroll-vp-counter" id="enrollStepCounter">0 / 20</span>
         </div>
         <div class="enroll-vp-instr-bar">
           <p class="enroll-instruction" id="enrollInstruction" data-i18n>Selecciona una persona</p>
@@ -132,7 +132,7 @@
 
       <!-- Auxiliary nodes (consumed by controller, not visible) -->
       <span id="enrollPhasePill" class="sr-only" aria-hidden="true">Preparacion</span>
-      <span id="enrollCurrentSamples" class="sr-only" aria-hidden="true">0 / 5</span>
+      <span id="enrollCurrentSamples" class="sr-only" aria-hidden="true">0 / 20</span>
 
       <!-- Warnings -->
       <div class="enroll-warning is-hidden" id="enrollFaceWarning" aria-live="assertive" aria-atomic="true">
@@ -147,6 +147,10 @@
         <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#users"></use></svg>
         <span data-i18n>Solo una persona</span>
       </div>
+      <div class="enroll-warning enroll-warning--glasses is-hidden" id="enrollGlassesWarning">
+        <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#alert-triangle"></use></svg>
+        <span data-i18n>Por favor, remueve los lentes</span>
+      </div>
 
       <!-- Capture flash -->
       <div class="enroll-flash" id="enrollFlash"></div>
@@ -159,7 +163,7 @@
           </svg>
         </div>
         <p class="enroll-completion-title" data-i18n>Listo</p>
-        <p class="enroll-completion-sub" id="enrollCompletionSub">35 fotos guardadas</p>
+        <p class="enroll-completion-sub" id="enrollCompletionSub">20 fotos guardadas</p>
         <div class="enroll-completion-actions">
           <button id="enrollTrainBtn" class="btn btn-primary" type="button">
             <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#sparkles"></use></svg>
@@ -191,8 +195,8 @@
         <h3 class="enroll-step-title" id="enrollActiveStepLabel" data-i18n>Mira de frente</h3>
         <p class="enroll-step-hint" id="enrollActiveStepHint" data-i18n>Sigue la guía hasta estabilizar el rostro.</p>
         <div class="enroll-step-stats">
-          <span id="enrollActiveStepSamples">0 / 5</span>
-          <span id="enrollActiveTotalSamples">0 / 35</span>
+          <span id="enrollActiveStepSamples">0 / 20</span>
+          <span id="enrollActiveTotalSamples">0 / 20</span>
         </div>
       </div>
 
@@ -213,7 +217,7 @@
         <div class="enroll-total-bar">
           <div class="enroll-total-fill" id="enrollTotalFill"></div>
         </div>
-        <span class="enroll-total-label" id="enrollTotalLabel">0 / 35</span>
+        <span class="enroll-total-label" id="enrollTotalLabel">0 / 20</span>
       </div>
     </div>
 

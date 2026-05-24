@@ -613,6 +613,12 @@
   border-color: rgba(239, 68, 68, 0.28);
 }
 
+.enroll-warning--glasses {
+  color: rgb(252, 186, 77);
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.32);
+}
+
 /* ── Flash ──────────────────────────────────────────────────────── */
 
 .enroll-flash {

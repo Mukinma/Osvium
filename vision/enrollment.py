@@ -22,12 +22,6 @@ logger = logging.getLogger("camerapi.enrollment")
 
 ENROLLMENT_STEPS: list[dict[str, str]] = [
     {"name": "center", "label": "Mira de frente", "icon": "circle-dot"},
-    {"name": "tilt_left", "label": "Inclina hacia la izquierda", "icon": "arrow-left"},
-    {"name": "tilt_right", "label": "Inclina hacia la derecha", "icon": "arrow-right"},
-    {"name": "look_up", "label": "Mira hacia arriba", "icon": "arrow-up"},
-    {"name": "look_down", "label": "Mira hacia abajo", "icon": "arrow-down"},
-    {"name": "turn_left", "label": "Gira a la izquierda", "icon": "rotate-ccw"},
-    {"name": "turn_right", "label": "Gira a la derecha", "icon": "rotate-cw"},
 ]
 
 STATES = frozenset(
@@ -71,10 +65,20 @@ class EnrollmentSession:
         self._last_face_ms: float = now
         self._message: str = ENROLLMENT_STEPS[0]["label"]
         self._faces_count: int = 0
+        self._glasses_detected: bool = False
+        self._last_glasses_check_ms: float = 0
         self._started_at_ms: int = int(now)
         self._updated_at_ms: int = int(now)
         self._samples_persisted: bool = False
         self._lock = threading.Lock()
+
+        # Glasses detection cascades
+        self._eye_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_eye.xml"
+        )
+        self._eye_glasses_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_eye_tree_eyeglasses.xml"
+        )
 
         self._user_dir = Path(config.dataset_dir) / f"user_{user_id}"
         self._user_dir.mkdir(parents=True, exist_ok=True)
@@ -88,6 +92,30 @@ class EnrollmentSession:
 
     def _touch(self, now: Optional[float] = None) -> None:
         self._updated_at_ms = int(now if now is not None else self._now())
+
+    def _detect_glasses(self, gray: np.ndarray, face: tuple[int, int, int, int]) -> bool:
+        """Detect glasses using eye cascades comparison.
+
+        Strategy: the *eyeglasses* cascade fires reliably on eyes with glasses,
+        while the plain *eye* cascade struggles when glasses are present.
+        If the glasses cascade finds eyes but the plain one does not, the
+        person is very likely wearing glasses.
+        """
+        x, y, w, h = [int(v) for v in face]
+        # Only inspect the upper half of the face ROI (eye region)
+        eye_region = gray[y : y + h // 2, x : x + w]
+        if eye_region.size == 0:
+            return False
+
+        params = {"scaleFactor": 1.15, "minNeighbors": 3, "minSize": (25, 25)}
+        eyes_plain = self._eye_cascade.detectMultiScale(eye_region, **params)
+        eyes_glasses = self._eye_glasses_cascade.detectMultiScale(eye_region, **params)
+
+        # Glasses detected when the glasses cascade finds eyes but the plain
+        # cascade finds fewer or none.
+        if len(eyes_glasses) >= 2 and len(eyes_plain) < 2:
+            return True
+        return False
 
     @property
     def state(self) -> str:
@@ -185,6 +213,18 @@ class EnrollmentSession:
         if faces_count > 1:
             self._state = "step_active"
             self._message = "Solo debe haber una persona"
+            self._hold_start_ms = None
+            self._touch(now)
+            return
+
+        # Glasses detection (throttled — only check every ~1s to avoid perf hit)
+        if now - self._last_glasses_check_ms > 1000:
+            self._glasses_detected = self._detect_glasses(gray, face)
+            self._last_glasses_check_ms = now
+
+        if self._glasses_detected:
+            self._state = "step_active"
+            self._message = "Por favor, remueve los lentes"
             self._hold_start_ms = None
             self._touch(now)
             return
@@ -421,6 +461,7 @@ class EnrollmentSession:
                 "face_detected": self._faces_count > 0 and self._state != "face_lost",
                 "brightness_ok": self._state != "low_light",
                 "multiple_faces": self._faces_count > 1,
+                "glasses_detected": self._glasses_detected,
             },
             "actions": {
                 "can_retry": can_retry,
