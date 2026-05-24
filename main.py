@@ -769,6 +769,7 @@ class AccessService:
                 "face_detected": False,
                 "brightness_ok": True,
                 "multiple_faces": False,
+                "glasses_detected": False,
             },
             "actions": {
                 "can_retry": False,

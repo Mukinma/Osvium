@@ -105,7 +105,7 @@ def test_completed_snapshot_marks_last_step_as_complete(tmp_path, monkeypatch):
     session._current_step = len(ENROLLMENT_STEPS) - 1
     session._state = "completed"
     session._samples = {
-        index: [f"{config.dataset_dir}/user_{session.user_id}/sample_{index}_{sample}.jpg" for sample in range(5)]
+        index: [f"{config.dataset_dir}/user_{session.user_id}/sample_{index}_{sample}.jpg" for sample in range(config.enrollment_samples_per_step)]
         for index in range(len(ENROLLMENT_STEPS))
     }
 

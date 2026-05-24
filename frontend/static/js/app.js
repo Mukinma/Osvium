@@ -28,6 +28,10 @@ const cameraRingHost = cameraShell || cameraStage;
 
 const faceGuide = document.getElementById('faceGuide');
 const guidanceMessage = document.getElementById('guidanceMessage');
+const faceArrowLeft = document.getElementById('faceArrowLeft');
+const faceArrowRight = document.getElementById('faceArrowRight');
+const faceArrowUp = document.getElementById('faceArrowUp');
+const faceArrowDown = document.getElementById('faceArrowDown');
 const cameraBadge = document.getElementById('cameraBadge');
 const cameraBadgeText = document.getElementById('cameraBadgeText');
 const infoPanel = document.getElementById('infoPanel');
@@ -333,16 +337,34 @@ function setFaceGuideState(cls) {
   faceGuide.classList.add(cls);
 }
 
+function setFaceArrows(left, right, up, down) {
+  faceArrowLeft?.classList.toggle('is-visible', left);
+  faceArrowRight?.classList.toggle('is-visible', right);
+  faceArrowUp?.classList.toggle('is-visible', up);
+  faceArrowDown?.classList.toggle('is-visible', down);
+}
+
+function hideAllFaceArrows() {
+  setFaceArrows(false, false, false, false);
+}
+
+const ARROW_OX_THRESHOLD = 0.06;
+const ARROW_OY_THRESHOLD = 0.06;
+const ARROW_SCALE_CLOSE = 1.35;
+const ARROW_SCALE_FAR = 0.70;
+
 function updateFaceGuidance(guidance, uiStateKey) {
   if (!faceGuide) return;
 
   // Post-recognition overrides are handled by updateFaceIndicator
   if (['granted', 'denied', 'unrecognized', 'blocked'].includes(uiStateKey)) {
+    hideAllFaceArrows();
     return;
   }
 
   if (!guidance || !guidance.state) {
     setFaceGuideState('is-idle');
+    hideAllFaceArrows();
     if (guidanceMessage) {
       guidanceMessage.textContent = tr('Coloca tu rostro dentro de la guía');
     }
@@ -354,6 +376,30 @@ function updateFaceGuidance(guidance, uiStateKey) {
 
   if (guidanceMessage && guidance.message) {
     guidanceMessage.textContent = tr(guidance.message);
+  }
+
+  // Flechas direccionales — solo en estado misaligned o lost
+  if (guidance.state === 'detected_misaligned' || guidance.state === 'lost') {
+    const ox = guidance.offset_x || 0;
+    const oy = guidance.offset_y || 0;
+    const sr = guidance.scale_ratio || 0;
+
+    // Prioridad: escala > horizontal > vertical
+    const tooClose = sr > ARROW_SCALE_CLOSE;
+    const tooFar = sr < ARROW_SCALE_FAR && sr > 0;
+
+    if (tooClose || tooFar) {
+      // No mostrar flechas laterales cuando el problema es distancia
+      hideAllFaceArrows();
+    } else {
+      const showLeft = ox > ARROW_OX_THRESHOLD;   // cara a la derecha → flecha izquierda
+      const showRight = ox < -ARROW_OX_THRESHOLD;  // cara a la izquierda → flecha derecha
+      const showUp = oy > ARROW_OY_THRESHOLD;      // cara abajo → flecha arriba
+      const showDown = oy < -ARROW_OY_THRESHOLD;   // cara arriba → flecha abajo
+      setFaceArrows(showLeft, showRight, showUp, showDown);
+    }
+  } else {
+    hideAllFaceArrows();
   }
 }
 

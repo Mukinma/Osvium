@@ -8,12 +8,6 @@
 (function () {
   const STEP_PREVIEW = [
     { name: 'center', label: 'Mira de frente', icon: 'circle-dot' },
-    { name: 'tilt_left', label: 'Inclina hacia la izquierda', icon: 'arrow-left' },
-    { name: 'tilt_right', label: 'Inclina hacia la derecha', icon: 'arrow-right' },
-    { name: 'look_up', label: 'Mira hacia arriba', icon: 'arrow-up' },
-    { name: 'look_down', label: 'Mira hacia abajo', icon: 'arrow-down' },
-    { name: 'turn_left', label: 'Gira a la izquierda', icon: 'rotate-ccw' },
-    { name: 'turn_right', label: 'Gira a la derecha', icon: 'rotate-cw' },
   ];
 
   const POLL_MS = 350;
@@ -39,6 +33,7 @@
   const faceWarningText = document.getElementById('enrollFaceWarningText');
   const lightWarning = document.getElementById('enrollLightWarning');
   const multiFaceWarning = document.getElementById('enrollMultiFaceWarning');
+  const glassesWarning = document.getElementById('enrollGlassesWarning');
   const flash = document.getElementById('enrollFlash');
   const completion = document.getElementById('enrollCompletion');
   const completionSub = document.getElementById('enrollCompletionSub');
@@ -103,9 +98,9 @@
       step_label: null,
       step_icon: null,
       samples_this_step: 0,
-      samples_needed: 5,
+      samples_needed: 20,
       total_captured: 0,
-      total_needed: STEP_PREVIEW.length * 5,
+      total_needed: STEP_PREVIEW.length * 20,
       steps_summary: STEP_PREVIEW.map((step) => ({
         ...step,
         status: 'pending',
@@ -121,6 +116,7 @@
         face_detected: false,
         brightness_ok: true,
         multiple_faces: false,
+        glasses_detected: false,
       },
       actions: {
         can_retry: false,
@@ -470,16 +466,16 @@
     if (status.phase === 'completed_review') return 'Revision final';
     if (status.phase === 'recoverable_error') return 'Sesion detenida';
     if (status.current_step == null) return 'Preparacion';
-    return `${tr('Movimiento')} ${status.current_step + 1} ${tr('de')} ${status.total_steps}`;
+    return tr('Capturando de frente');
   }
 
   function currentSamplesText(status = enrollmentStatus) {
-    const needed = status.samples_needed || 5;
+    const needed = status.samples_needed || 20;
     return `${status.samples_this_step || 0} ${tr('de')} ${needed} ${tr(needed === 1 ? 'foto' : 'fotos')}`;
   }
 
   function totalSamplesText(status = enrollmentStatus) {
-    const total = status.total_needed || 35;
+    const total = status.total_needed || 20;
     return `${status.total_captured || 0} ${tr('de')} ${total} ${tr(total === 1 ? 'foto' : 'fotos')}`;
   }
 
@@ -733,8 +729,9 @@
   function renderWarnings() {
     const guidance = enrollmentStatus.guidance || {};
     const showMulti = isActivePhase() && guidance.multiple_faces;
-    const showLight = isActivePhase() && !showMulti && guidance.brightness_ok === false;
-    const showFace = isActivePhase() && !showMulti && !showLight && guidance.face_detected === false;
+    const showGlasses = isActivePhase() && !showMulti && guidance.glasses_detected;
+    const showLight = isActivePhase() && !showMulti && !showGlasses && guidance.brightness_ok === false;
+    const showFace = isActivePhase() && !showMulti && !showGlasses && !showLight && guidance.face_detected === false;
 
     if (faceWarningText) {
       faceWarningText.textContent = enrollmentStatus.state === 'face_lost'
@@ -745,6 +742,7 @@
     faceWarning?.classList.toggle('is-hidden', !showFace);
     lightWarning?.classList.toggle('is-hidden', !showLight);
     multiFaceWarning?.classList.toggle('is-hidden', !showMulti);
+    glassesWarning?.classList.toggle('is-hidden', !showGlasses);
   }
 
   async function enterEnrollmentView() {
@@ -793,6 +791,7 @@
     faceWarning?.classList.add('is-hidden');
     lightWarning?.classList.add('is-hidden');
     multiFaceWarning?.classList.add('is-hidden');
+    glassesWarning?.classList.add('is-hidden');
   }
 
   async function startEnrollment() {

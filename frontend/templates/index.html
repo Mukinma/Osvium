@@ -82,10 +82,9 @@
             <img id="videoFeed" class="kiosk-camera__feed" src="" data-stream-src="/api/stream" alt="Cámara en vivo" />
 
             <div id="faceGuide" class="face-guide is-idle" aria-hidden="true">
-              <!-- Face silhouette guide -->
               <svg class="face-guide__silhouette" viewBox="0 0 400 520" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Head + jaw + chin realistic silhouette -->
-                <path d="
+                <!-- Fondo negro suave redondeado para contraste con iluminación real -->
+                <path class="face-guide__backdrop" d="
                   M200 30
                   C 100 30, 50 120, 50 210
                   C 50 290, 70 340, 100 380
@@ -94,11 +93,42 @@
                   L 300 380
                   C 330 340, 350 290, 350 210
                   C 350 120, 300 30, 200 30 Z"
-                  stroke="currentColor" stroke-width="3" fill="none"
-                  stroke-dasharray="10 5" opacity="0.7"/>
+                  fill="rgba(0,0,0,0.25)" stroke="none"/>
+                <!-- Marco principal — hereda color de .face-guide via currentColor -->
+                <path class="face-guide__stroke" d="
+                  M200 30
+                  C 100 30, 50 120, 50 210
+                  C 50 290, 70 340, 100 380
+                  L 130 420
+                  Q 200 480, 270 420
+                  L 300 380
+                  C 330 340, 350 290, 350 210
+                  C 350 120, 300 30, 200 30 Z"
+                  stroke="currentColor" stroke-width="4" fill="none"
+                  stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              <!-- Guidance message -->
-              <div class="face-guide__msg" id="guidanceMessage" data-i18n>Coloca tu rostro dentro de la guía</div>
+
+              <!-- Flechas direccionales — aparecen cuando el rostro se desplaza -->
+              <div class="face-arrow face-arrow--left" id="faceArrowLeft" aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M20 6 L10 16 L20 26" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="face-arrow face-arrow--right" id="faceArrowRight" aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 6 L22 16 L12 26" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="face-arrow face-arrow--up" id="faceArrowUp" aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 20 L16 10 L26 20" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="face-arrow face-arrow--down" id="faceArrowDown" aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 12 L16 22 L26 12" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
             </div>
 
             <div id="faceIndicator" class="face-indicator idle" aria-hidden="true" hidden></div>

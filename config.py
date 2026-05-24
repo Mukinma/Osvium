@@ -106,7 +106,7 @@ class AppConfig:
     admin_password: str = os.getenv("CAMERAPI_ADMIN_PASSWORD", "")
 
     # ── Enrollment ──
-    enrollment_samples_per_step: int = 5
+    enrollment_samples_per_step: int = 20
     enrollment_hold_steady_ms: int = 600
     enrollment_brightness_threshold: float = 40.0
     enrollment_face_lost_timeout_ms: int = 3000
