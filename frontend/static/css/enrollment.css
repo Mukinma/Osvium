@@ -567,6 +567,65 @@
   min-height: 1.2em;
 }
 
+/* ── Minimal HUD mode (simplified enrollment) ─────────────────── */
+
+.enroll-vp-hud--minimal {
+  justify-content: flex-end;
+}
+
+.enroll-guidance-line {
+  margin: 0;
+  padding: 14px 16px 18px;
+  background: linear-gradient(to top, rgba(4, 8, 15, 0.88) 50%, transparent);
+  text-align: center;
+  font-size: 19px;
+  font-weight: 700;
+  color: rgba(214, 230, 255, 0.88);
+  line-height: 1.35;
+  min-height: 1.2em;
+  letter-spacing: 0.01em;
+}
+
+.enroll-viewport-card--full {
+  flex: 1;
+  min-height: 300px;
+}
+
+/* ── Simple progress bar (single-source) ──────────────────────── */
+
+.enroll-simple-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.enroll-simple-progress__bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.enroll-simple-progress__fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--admin-accent, #7aa6ff);
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  width: 0%;
+}
+
+.enroll-simple-progress__label {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 58px;
+  text-align: right;
+}
+
 /* ── Viewport warnings ──────────────────────────────────────────── */
 
 .enroll-warning {

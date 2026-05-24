@@ -458,7 +458,7 @@ class EnrollmentSession:
                 "arrow": guidance_arrow,
                 "hold_progress": round(hold_progress, 3),
                 "pose_matched": self._state in ("holding", "capturing", "step_complete", "completed"),
-                "face_detected": self._faces_count > 0 and self._state != "face_lost",
+                "face_detected": self._state != "face_lost",
                 "brightness_ok": self._state != "low_light",
                 "multiple_faces": self._faces_count > 1,
                 "glasses_detected": self._glasses_detected,

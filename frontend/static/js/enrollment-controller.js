@@ -731,7 +731,7 @@
     const showMulti = isActivePhase() && guidance.multiple_faces;
     const showGlasses = isActivePhase() && !showMulti && guidance.glasses_detected;
     const showLight = isActivePhase() && !showMulti && !showGlasses && guidance.brightness_ok === false;
-    const showFace = isActivePhase() && !showMulti && !showGlasses && !showLight && guidance.face_detected === false;
+    const showFace = isActivePhase() && !showMulti && !showGlasses && !showLight && enrollmentStatus.state === 'face_lost';
 
     if (faceWarningText) {
       faceWarningText.textContent = enrollmentStatus.state === 'face_lost'

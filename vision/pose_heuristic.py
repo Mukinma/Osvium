@@ -31,8 +31,8 @@ class PoseHints:
 
 STEP_THRESHOLDS: dict[str, dict[str, Any]] = {
     "center": {
-        "max_abs_offset_x": 0.06,
-        "max_abs_offset_y": 0.08,
+        "max_abs_offset_x": 0.15,
+        "max_abs_offset_y": 0.18,
         "require_frontal": True,
     },
     "tilt_left": {
