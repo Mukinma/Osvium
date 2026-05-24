@@ -95,19 +95,11 @@
   <!-- / ETAPA A -->
 
 
-  <!-- ─────────────────────── ETAPA B: Captura ─────────────────────── -->
+  <!-- ─────────────────────── ETAPA B: Captura (simplificada) ─────────────────────── -->
   <div id="enrollStepsPanel" class="enroll-stage" hidden>
 
-    <div class="enroll-hud-strip enroll-hud-strip--capture">
-      <span class="enroll-hud-label" data-i18n>Registro facial</span>
-      <div class="enroll-hud-right">
-        <span class="enroll-user-chip" id="enrollUserMeta">—</span>
-        <span class="enroll-total-chip" id="enrollSummaryTotal">0 / 20</span>
-      </div>
-    </div>
-
     <!-- Viewport -->
-    <div id="enrollViewport" class="enroll-viewport-card">
+    <div id="enrollViewport" class="enroll-viewport-card enroll-viewport-card--full">
       <img
         id="enrollStream"
         class="enroll-stream"
@@ -118,25 +110,29 @@
       />
       <canvas id="enrollOverlay" class="enroll-overlay"></canvas>
 
-      <!-- HUD chips + instruction bar -->
-      <div class="enroll-vp-hud" id="enrollHud" aria-live="polite">
-        <div class="enroll-vp-topline">
-          <span class="enrollment-step-badge" id="enrollStepBadge" data-i18n>Preparando</span>
-          <span class="enroll-vp-counter" id="enrollStepCounter">0 / 20</span>
-        </div>
-        <div class="enroll-vp-instr-bar">
-          <p class="enroll-instruction" id="enrollInstruction" data-i18n>Selecciona una persona</p>
-          <p class="enroll-message" id="enrollMessage" data-i18n>Centra el rostro antes de empezar.</p>
-        </div>
+      <!-- Single guidance line at bottom of viewport -->
+      <div class="enroll-vp-hud enroll-vp-hud--minimal" id="enrollHud" aria-live="polite">
+        <p class="enroll-guidance-line" id="enrollMessage"></p>
       </div>
 
-      <!-- Auxiliary nodes (consumed by controller, not visible) -->
+      <!-- Auxiliary nodes (consumed by controller, kept as sr-only) -->
       <span id="enrollPhasePill" class="sr-only" aria-hidden="true">Preparacion</span>
       <span id="enrollCurrentSamples" class="sr-only" aria-hidden="true">0 / 20</span>
+      <span id="enrollStepBadge" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollStepCounter" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollInstruction" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollUserMeta" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollSummaryUser" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollSummaryPhase" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollSummaryTotal" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollActiveStepLabel" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollActiveStepHint" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollActiveStepSamples" class="sr-only" aria-hidden="true"></span>
+      <span id="enrollActiveTotalSamples" class="sr-only" aria-hidden="true"></span>
 
       <!-- Warnings -->
       <div class="enroll-warning is-hidden" id="enrollFaceWarning" aria-live="assertive" aria-atomic="true">
-        <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#scan-face"></use></svg>
+        <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#alert-triangle"></use></svg>
         <span id="enrollFaceWarningText" data-i18n>Centra tu rostro</span>
       </div>
       <div class="enroll-warning enroll-warning--light is-hidden" id="enrollLightWarning">
@@ -174,52 +170,27 @@
       </div>
     </div>
 
-    <!-- Dots -->
-    <div class="enroll-dots" id="enrollDots" role="progressbar" aria-label="Pasos completados" data-i18n-attr="aria-label:Pasos completados"></div>
-
-    <!-- Hidden summary (consumed by controller) -->
-    <div class="sr-only" aria-hidden="true">
-      <span id="enrollSummaryUser">-</span>
-      <span id="enrollSummaryPhase">Preparacion</span>
+    <!-- Progress bar + counter (single source of truth) -->
+    <div class="enroll-simple-progress" id="enrollTotalProgress">
+      <div class="enroll-simple-progress__bar">
+        <div class="enroll-simple-progress__fill" id="enrollTotalFill"></div>
+      </div>
+      <span class="enroll-simple-progress__label" id="enrollTotalLabel">0 / 20</span>
     </div>
 
-    <!-- Progress card -->
-    <div class="enroll-card enroll-progress-card">
-      <span class="hud-corner hud-tl" aria-hidden="true"></span>
-      <span class="hud-corner hud-tr" aria-hidden="true"></span>
-      <span class="hud-corner hud-bl" aria-hidden="true"></span>
-      <span class="hud-corner hud-br" aria-hidden="true"></span>
-
-      <!-- Active step focus -->
-      <div class="enroll-step-focus" id="enrollStepFocus">
-        <h3 class="enroll-step-title" id="enrollActiveStepLabel" data-i18n>Mira de frente</h3>
-        <p class="enroll-step-hint" id="enrollActiveStepHint" data-i18n>Sigue la guía hasta estabilizar el rostro.</p>
-        <div class="enroll-step-stats">
-          <span id="enrollActiveStepSamples">0 / 20</span>
-          <span id="enrollActiveTotalSamples">0 / 20</span>
-        </div>
-      </div>
-
-      <!-- Error banner -->
-      <div class="enrollment-error-banner is-hidden" id="enrollErrorBanner" role="alert">
-        <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#alert-triangle"></use></svg>
-        <div>
-          <strong id="enrollErrorTitle" data-i18n>Error en la captura</strong>
-          <p id="enrollErrorText" data-i18n>Revisa la cámara e intenta de nuevo.</p>
-        </div>
-      </div>
-
-      <!-- Steps list (rendered by controller) -->
-      <ul class="enrollment-steps-list" id="enrollStepsList"></ul>
-
-      <!-- Total progress bar -->
-      <div class="enroll-total-progress" id="enrollTotalProgress">
-        <div class="enroll-total-bar">
-          <div class="enroll-total-fill" id="enrollTotalFill"></div>
-        </div>
-        <span class="enroll-total-label" id="enrollTotalLabel">0 / 20</span>
+    <!-- Error banner -->
+    <div class="enrollment-error-banner is-hidden" id="enrollErrorBanner" role="alert">
+      <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#alert-triangle"></use></svg>
+      <div>
+        <strong id="enrollErrorTitle" data-i18n>Error en la captura</strong>
+        <p id="enrollErrorText" data-i18n>Revisa la cámara e intenta de nuevo.</p>
       </div>
     </div>
+
+    <!-- Hidden: dots and steps list (elements exist for controller, rendered empty) -->
+    <div id="enrollDots" class="sr-only" aria-hidden="true"></div>
+    <ul id="enrollStepsList" class="sr-only" aria-hidden="true"></ul>
+    <div id="enrollStepFocus" class="sr-only" aria-hidden="true"></div>
 
     <!-- Sticky actions -->
     <div class="enroll-sticky-actions enroll-sticky-actions--capture">
