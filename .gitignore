@@ -56,6 +56,12 @@ deploy/
 *.pem
 *.key
 
+# ─── AI tool config (no pertenece al proyecto) ──────
+.claude/
+.codex/
+.agents/
+skills-lock.json
+
 # ─── Otros generados ─────────────────────────────────
 *.bak
 *.tmp

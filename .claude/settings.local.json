@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find /c/Users/Santiago/Desktop/Vireom/Vireom/frontend -type f -name *kiosk* -o -name *enrollment* -o -name *lock*)",
-      "Bash(grep -E \"\\\\.\\(js|html|tsx|jsx\\)$\")",
-      "Bash(.venv/bin/python *)"
-    ]
-  }
-}
