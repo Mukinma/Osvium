@@ -575,12 +575,12 @@
 
 .enroll-guidance-line {
   margin: 0;
-  padding: 14px 16px 18px;
+  padding: 18px 18px 22px;
   background: linear-gradient(to top, rgba(4, 8, 15, 0.88) 50%, transparent);
   text-align: center;
-  font-size: 19px;
-  font-weight: 700;
-  color: rgba(214, 230, 255, 0.88);
+  font-size: 22px;
+  font-weight: 800;
+  color: rgba(214, 230, 255, 0.92);
   line-height: 1.35;
   min-height: 1.2em;
   letter-spacing: 0.01em;
@@ -589,6 +589,8 @@
 .enroll-viewport-card--full {
   flex: 1;
   min-height: 300px;
+  max-height: none;
+  aspect-ratio: auto;
 }
 
 /* ── Simple progress bar (single-source) ──────────────────────── */
@@ -596,13 +598,13 @@
 .enroll-simple-progress {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 14px;
+  padding: 16px 16px 12px;
 }
 
 .enroll-simple-progress__bar {
   flex: 1;
-  height: 8px;
+  height: 14px;
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
@@ -617,12 +619,12 @@
 }
 
 .enroll-simple-progress__label {
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 17px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.6);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  min-width: 58px;
+  min-width: 66px;
   text-align: right;
 }
 
@@ -1039,13 +1041,13 @@
 /* ── Sticky capture actions (etapa B) ───────────────────────────── */
 
 .enroll-sticky-actions--capture {
-  padding-top: 14px;
+  padding-top: 10px;
 }
 
 .enroll-abort-btn {
   flex: 1;
-  height: 64px;
-  font-size: 18px;
+  height: 72px;
+  font-size: 20px;
   font-weight: 600;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1063,8 +1065,8 @@
 }
 
 .enroll-action-ghost {
-  height: 64px;
-  font-size: 17px;
+  height: 72px;
+  font-size: 19px;
   font-weight: 600;
   border-radius: 16px;
   display: flex;
@@ -1091,6 +1093,11 @@
   .enroll-viewport-card {
     aspect-ratio: 4 / 3;
     max-height: 54vh;
+  }
+
+  .enroll-viewport-card--full {
+    max-height: none;
+    aspect-ratio: auto;
   }
 
   .enroll-readiness-grid {
@@ -1128,6 +1135,11 @@
   .enroll-viewport-card {
     aspect-ratio: 4 / 3;
     max-height: 60vh;
+  }
+
+  .enroll-viewport-card--full {
+    max-height: none;
+    aspect-ratio: auto;
   }
 
   .enroll-cta-btn {
