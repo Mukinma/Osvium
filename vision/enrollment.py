@@ -218,16 +218,10 @@ class EnrollmentSession:
             return
 
         # Glasses detection (throttled — only check every ~1s to avoid perf hit)
+        # Only sets the flag for a frontend warning; does NOT block capture.
         if now - self._last_glasses_check_ms > 1000:
             self._glasses_detected = self._detect_glasses(gray, face)
             self._last_glasses_check_ms = now
-
-        if self._glasses_detected:
-            self._state = "step_active"
-            self._message = "Por favor, remueve los lentes"
-            self._hold_start_ms = None
-            self._touch(now)
-            return
 
         frame_shape = gray.shape
         hints = self.pose.analyze(gray, face, frame_shape)

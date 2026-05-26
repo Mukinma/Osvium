@@ -7,17 +7,17 @@
 /* ── View container ─────────────────────────────────────────────── */
 
 #view-enrolamiento {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding: 0;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Outer wrap ─────────────────────────────────────────────────── */
 
 .enroll-wrap {
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -31,6 +31,17 @@
   padding: 18px 16px 0;
   flex: 1;
   min-height: 0;
+}
+
+#enrollInstructionsPanel {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#enrollStepsPanel {
+  position: relative;
+  padding: 8px 0 0;
+  gap: 10px;
 }
 
 #enrollInstructionsPanel[hidden],
@@ -470,18 +481,18 @@
   box-shadow:
     0 6px 40px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
   aspect-ratio: 3 / 4;
   max-height: 56vh;
   min-height: 260px;
 }
 
 .enroll-stream {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: inherit;
 }
 
 .enroll-overlay {
@@ -490,7 +501,6 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  border-radius: inherit;
 }
 
 /* ── Viewport HUD ───────────────────────────────────────────────── */
@@ -586,11 +596,18 @@
   letter-spacing: 0.01em;
 }
 
-.enroll-viewport-card--full {
+/* ID raises specificity so media-query overrides on .enroll-viewport-card
+   never accidentally undo full-bleed mode.
+   Uses flex instead of absolute so it shares space with the controls area. */
+#enrollViewport.enroll-viewport-card--full {
+  position: relative;
   flex: 1;
-  min-height: 300px;
+  min-height: 0;
   max-height: none;
   aspect-ratio: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* ── Simple progress bar (single-source) ──────────────────────── */
@@ -599,7 +616,15 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 16px 12px;
+  padding: 12px 16px;
+}
+
+#enrollStepsPanel .enroll-simple-progress {
+  flex-shrink: 0;
+  order: 2;
+  z-index: 10;
+  padding: 4px 4px max(env(safe-area-inset-bottom, 0px), 6px);
+  background: transparent;
 }
 
 .enroll-simple-progress__bar {
@@ -706,7 +731,7 @@
 .enroll-completion {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: 15;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -912,6 +937,18 @@
   color: rgba(252, 129, 129, 0.96);
 }
 
+#enrollStepsPanel .enrollment-error-banner {
+  position: absolute;
+  bottom: 22%;
+  left: 12px;
+  right: 12px;
+  z-index: 12;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 .enrollment-error-banner.is-hidden {
   display: none;
 }
@@ -1040,19 +1077,28 @@
 
 /* ── Sticky capture actions (etapa B) ───────────────────────────── */
 
-.enroll-sticky-actions--capture {
-  padding-top: 10px;
+#enrollStepsPanel .enroll-sticky-actions--capture {
+  position: static;
+  flex-shrink: 0;
+  order: 1;
+  z-index: 11;
+  padding: 4px 4px 0;
+  background: transparent;
+  margin-top: 0;
+  justify-content: center;
 }
 
 .enroll-abort-btn {
   flex: 1;
-  height: 72px;
-  font-size: 20px;
+  height: 56px;
+  font-size: 17px;
   font-weight: 600;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(225, 238, 255, 0.65);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(4, 8, 15, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: rgba(225, 238, 255, 0.75);
   cursor: pointer;
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
   touch-action: manipulation;
@@ -1065,8 +1111,8 @@
 }
 
 .enroll-action-ghost {
-  height: 72px;
-  font-size: 19px;
+  height: 56px;
+  font-size: 16px;
   font-weight: 600;
   border-radius: 16px;
   display: flex;
@@ -1093,11 +1139,6 @@
   .enroll-viewport-card {
     aspect-ratio: 4 / 3;
     max-height: 54vh;
-  }
-
-  .enroll-viewport-card--full {
-    max-height: none;
-    aspect-ratio: auto;
   }
 
   .enroll-readiness-grid {
@@ -1132,14 +1173,13 @@
     width: 100%;
   }
 
+  #enrollStepsPanel {
+    max-width: none;
+  }
+
   .enroll-viewport-card {
     aspect-ratio: 4 / 3;
     max-height: 60vh;
-  }
-
-  .enroll-viewport-card--full {
-    max-height: none;
-    aspect-ratio: auto;
   }
 
   .enroll-cta-btn {

@@ -82,6 +82,7 @@
   let isViewActive = false;
   let isStarting = false;
   let isTraining = false;
+  let isAutoFinishing = false;
   let pendingUserId = null;
   let enterViewPromise = null;
   let animFrame = null;
@@ -280,7 +281,7 @@
     animFrame = requestAnimationFrame(drawOverlay);
   }
 
-  function drawArrow(ctx, cx, cy, rx, ry, direction) {
+  function drawArrow(ctx, cx, cy, r, _unused, direction) {
     const time = Date.now();
     const bounce = Math.sin(time / 200) * 6;
     const arrowSize = 18;
@@ -290,23 +291,23 @@
 
     switch (direction) {
       case 'left':
-        ax = cx - rx - 30 + bounce;
+        ax = cx - r - 30 + bounce;
         ay = cy;
         angle = Math.PI;
         break;
       case 'right':
-        ax = cx + rx + 30 - bounce;
+        ax = cx + r + 30 - bounce;
         ay = cy;
         angle = 0;
         break;
       case 'up':
         ax = cx;
-        ay = cy - ry - 30 + bounce;
+        ay = cy - r - 30 + bounce;
         angle = -Math.PI / 2;
         break;
       case 'down':
         ax = cx;
-        ay = cy + ry + 30 - bounce;
+        ay = cy + r + 30 - bounce;
         angle = Math.PI / 2;
         break;
       default:
@@ -342,12 +343,11 @@
 
     const cx = width * 0.5;
     const cy = height * 0.42;
-    const rx = width * 0.17;
-    const ry = height * 0.24;
+    const r = Math.min(width, height) * 0.28;
 
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, r, r, 0, 0, Math.PI * 2);
 
     if (guidance.multiple_faces) {
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.78)';
@@ -388,7 +388,7 @@
     if (enrollmentStatus.state === 'holding' && guidance.hold_progress > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.ellipse(cx, cy, rx + 6, ry + 6, 0, -Math.PI / 2, -Math.PI / 2 + (guidance.hold_progress * Math.PI * 2));
+      ctx.ellipse(cx, cy, r + 6, r + 6, 0, -Math.PI / 2, -Math.PI / 2 + (guidance.hold_progress * Math.PI * 2));
       ctx.strokeStyle = 'rgba(34, 197, 94, 0.92)';
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
@@ -399,7 +399,7 @@
     }
 
     if (guidance.arrow && !guidance.pose_matched && guidance.face_detected && !guidance.multiple_faces) {
-      drawArrow(ctx, cx, cy, rx, ry, guidance.arrow);
+      drawArrow(ctx, cx, cy, r, r, guidance.arrow);
     }
   }
 
@@ -708,7 +708,7 @@
     if (completion) completion.classList.toggle('is-hidden', !shouldShowCompletion);
     if (completionSub) {
       completionSub.textContent = shouldShowCompletion
-        ? `${enrollmentStatus.total_captured} ${tr('muestras listas para entrenar')}`
+        ? tr('Entrenando modelo...')
         : `${enrollmentStatus.total_captured} ${tr('muestras capturadas')}`;
     }
 
@@ -716,6 +716,10 @@
     if (retryBtn) retryBtn.hidden = !enrollmentStatus.actions?.can_retry;
     if (trainBtn) trainBtn.disabled = isTraining;
     if (finishBtn) finishBtn.disabled = isTraining;
+
+    if (shouldShowCompletion && !isAutoFinishing) {
+      void autoFinishEnrollment();
+    }
 
     if (enrollmentStatus.total_captured > previousTotalCaptured) {
       triggerFlash();
@@ -743,6 +747,60 @@
     lightWarning?.classList.toggle('is-hidden', !showLight);
     multiFaceWarning?.classList.toggle('is-hidden', !showMulti);
     glassesWarning?.classList.toggle('is-hidden', !showGlasses);
+  }
+
+  async function autoFinishEnrollment() {
+    if (isAutoFinishing) return;
+    isAutoFinishing = true;
+    stopPolling();
+
+    // Brief pause so the user sees "Listo"
+    await new Promise((r) => setTimeout(r, 1500));
+
+    // Auto-train
+    try {
+      const trainResult = await requestJson('/api/train', { method: 'POST' });
+      if (trainResult.ok) {
+        showAdminToastSafe({
+          text: tr('Modelo actualizado'),
+          sub: `${trainResult.data.samples_used} ${tr('muestras de')} ${trainResult.data.unique_users} ${tr('personas')}`,
+          cls: 'success',
+        });
+      } else {
+        showAdminToastSafe({
+          text: tr('Las muestras se guardaron'),
+          sub: tr('El modelo se puede entrenar despues desde Sistema'),
+          cls: 'warning',
+          timeout: 3400,
+        });
+      }
+    } catch (_) {
+      showAdminToastSafe({
+        text: tr('Las muestras se guardaron'),
+        sub: tr('El modelo se puede entrenar despues desde Sistema'),
+        cls: 'warning',
+        timeout: 3400,
+      });
+    }
+
+    // Finish session
+    try {
+      await requestJson('/api/enrollment/finish', { method: 'POST' });
+    } catch (_) {
+      // Best effort
+    }
+
+    isAutoFinishing = false;
+    resetUI();
+
+    // Navigate back to Personas and refresh user list
+    if (typeof window.showPersonasListMode === 'function') {
+      window.showPersonasListMode();
+    }
+    // Force-refresh the personas data so photo count is current
+    if (typeof window.CameraPIAdminRefreshUsers === 'function') {
+      window.CameraPIAdminRefreshUsers();
+    }
   }
 
   async function enterEnrollmentView() {
@@ -1015,13 +1073,7 @@
     void goBackFromPreflight();
   });
 
-  trainBtn?.addEventListener('click', () => {
-    void finishSession({ trainFirst: true });
-  });
-
-  finishBtn?.addEventListener('click', () => {
-    void finishSession({ trainFirst: false });
-  });
+  // trainBtn and finishBtn listeners removed — enrollment auto-trains on completion
 
   userSelect?.addEventListener('change', () => {
     pendingUserId = userSelect.value || null;

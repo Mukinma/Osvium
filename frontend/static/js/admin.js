@@ -1649,6 +1649,12 @@ function navigateToAdminView(viewId) {
 window.showPersonasListMode = function showPersonasListMode() {
   if (window.CameraPIEnrollment) window.CameraPIEnrollment.reset();
   navigateToAdminView('personas');
+  // Refresh user data so photo counts are current
+  loadUsers().catch(() => {});
+};
+
+window.CameraPIAdminRefreshUsers = function () {
+  loadUsers().catch(() => {});
 };
 
 window.startEnrollForUser = function (userId, userName) {
