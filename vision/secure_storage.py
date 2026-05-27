@@ -145,6 +145,26 @@ class SecureStorage:
             logger.exception("secure_storage load_model failed: %s", path)
             return False
 
+    def write_data(self, path: Path, data: bytes) -> None:
+        """Write raw bytes to disk, encrypting if enabled."""
+        if self._enabled:
+            data = self._fernet.encrypt(data)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def read_data(self, path: Path) -> Optional[bytes]:
+        """Read raw bytes from disk, decrypting if enabled. None if missing."""
+        if not path.exists():
+            return None
+        try:
+            data = path.read_bytes()
+            if self._enabled:
+                data = self._fernet.decrypt(data)
+            return data
+        except Exception:
+            logger.exception("secure_storage read_data failed: %s", path)
+            return None
+
     def encrypt_file(self, path: Path) -> None:
         """Encrypt an existing plain-text file in-place (migration use)."""
         if not self._enabled:

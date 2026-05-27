@@ -1,8 +1,15 @@
 from typing import Any
 
 import cv2
+import numpy as np
 
 from config import config
+
+try:
+    from insightface.app import FaceAnalysis
+    _HAS_INSIGHTFACE = True
+except ImportError:
+    _HAS_INSIGHTFACE = False
 
 
 class HaarFaceDetector:
@@ -65,3 +72,51 @@ class HaarFaceDetector:
             minNeighbors=min_neighbors,
             minSize=min_size_tuple,
         )
+
+
+class InsightFaceDetector:
+    """Face detector using SCRFD via InsightFace + ONNX Runtime.
+
+    Far more robust than Haar cascades for faces with accessories
+    (helmets, glasses, masks).  Accepts grayscale or BGR input.
+    """
+
+    def __init__(self, det_size: tuple[int, int] = (640, 480),
+                 model_name: str = "buffalo_l"):
+        if not _HAS_INSIGHTFACE:
+            raise ImportError(
+                "insightface is required for InsightFaceDetector. "
+                "Install: pip install insightface onnxruntime"
+            )
+        self._app = FaceAnalysis(
+            name=model_name,
+            allowed_modules=["detection"],
+            providers=["CPUExecutionProvider"],
+        )
+        self._app.prepare(ctx_id=-1, det_size=det_size)
+
+    def detect(self, image: np.ndarray, params: dict[str, Any],
+               ) -> list[tuple[int, int, int, int]]:
+        min_size = params.get("minSize", [config.detect_min_size_w, config.detect_min_size_h])
+        min_w, min_h = int(min_size[0]), int(min_size[1])
+
+        if len(image.shape) == 2:
+            bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        else:
+            bgr = image
+
+        raw_faces = self._app.get(bgr)
+
+        faces: list[tuple[int, int, int, int]] = []
+        img_h, img_w = image.shape[:2]
+        for face in raw_faces:
+            bbox = face.bbox.astype(int)
+            x = max(0, int(bbox[0]))
+            y = max(0, int(bbox[1]))
+            x2 = min(img_w, int(bbox[2]))
+            y2 = min(img_h, int(bbox[3]))
+            w = x2 - x
+            h = y2 - y
+            if w >= min_w and h >= min_h:
+                faces.append((x, y, w, h))
+        return faces

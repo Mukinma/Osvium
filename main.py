@@ -31,6 +31,13 @@ from vision.recognizer import LBPHRecognizer
 from vision.secure_storage import storage as _storage
 from vision.trainer import FaceTrainer
 
+try:
+    from vision.detector import InsightFaceDetector, _HAS_INSIGHTFACE as _IF_DETECT
+    from vision.recognizer import InsightFaceRecognizer, _HAS_INSIGHTFACE as _IF_RECOG
+    _HAS_INSIGHTFACE = _IF_DETECT and _IF_RECOG
+except ImportError:
+    _HAS_INSIGHTFACE = False
+
 
 logger = logging.getLogger("camerapi.main")
 
@@ -38,8 +45,19 @@ logger = logging.getLogger("camerapi.main")
 class AccessService:
     def __init__(self):
         self.camera = CameraStream()
-        self.detector = HaarFaceDetector()
-        self.recognizer = LBPHRecognizer()
+
+        if config.recognition_engine == "insightface" and _HAS_INSIGHTFACE:
+            self.detector = InsightFaceDetector()
+            self.recognizer = InsightFaceRecognizer()
+            logger.info("recognition_engine=insightface")
+        else:
+            self.detector = HaarFaceDetector()
+            self.recognizer = LBPHRecognizer()
+            if config.recognition_engine == "insightface" and not _HAS_INSIGHTFACE:
+                logger.warning("insightface_not_available falling_back_to_lbph "
+                               "(pip install insightface onnxruntime)")
+            logger.info("recognition_engine=lbph")
+
         self.trainer = FaceTrainer(self.recognizer)
         self.relay = RelayController(pin=18, active_high=True)
         self.guidance = FaceGuidanceEngine()
@@ -533,7 +551,9 @@ class AccessService:
 
             conf = db.get_config()
             predict_t0 = time.perf_counter()
-            label, confidence = self.recognizer.predict(roi)
+            label, confidence = self.recognizer.predict(
+                roi, frame=frame, face_location=face,
+            )
             predict_ms = (time.perf_counter() - predict_t0) * 1000.0
             self.recognition_time_total_ms += predict_ms
             self.recognition_count += 1

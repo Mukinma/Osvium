@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
+_RECOGNITION_ENGINE = os.getenv("CAMERAPI_RECOGNITION_ENGINE", "insightface")
+
 
 def _env_bool(name: str, default: bool = False) -> bool:
     raw = os.getenv(name)
@@ -66,8 +68,15 @@ class AppConfig:
     # Requires CAMERAPI_SECRET to be set.  Run migrate_encrypt_dataset.py first.
     storage_encrypted: bool = _env_bool("CAMERAPI_STORAGE_ENCRYPTED", False)
 
+    # ── Recognition engine ──
+    recognition_engine: str = _RECOGNITION_ENGINE
+
     db_path: str = "database/camerapi.db"
-    model_path: str = "models/lbph_model.xml"
+    model_path: str = (
+        "models/face_encodings.pkl"
+        if _RECOGNITION_ENGINE == "insightface"
+        else "models/lbph_model.xml"
+    )
     dataset_dir: str = "dataset"
     logs_path: str = "logs/system.log"
 
@@ -98,7 +107,7 @@ class AppConfig:
     lbph_grid_x: int = 8
     lbph_grid_y: int = 8
 
-    default_confidence_threshold: float = 70.0
+    default_confidence_threshold: float = 50.0 if _RECOGNITION_ENGINE == "insightface" else 70.0
     default_open_seconds: int = 3
     default_max_attempts: int = 3
 

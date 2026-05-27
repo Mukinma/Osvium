@@ -1,15 +1,22 @@
 from pathlib import Path
+from typing import Union
 
 import cv2
 
 from config import config
 from database.db import db
 from vision.recognizer import LBPHRecognizer
+
+try:
+    from vision.recognizer import InsightFaceRecognizer
+except ImportError:
+    InsightFaceRecognizer = None  # type: ignore[assignment,misc]
+
 from vision.secure_storage import storage as _storage
 
 
 class FaceTrainer:
-    def __init__(self, recognizer: LBPHRecognizer):
+    def __init__(self, recognizer: Union["LBPHRecognizer", "InsightFaceRecognizer"]):
         self.recognizer = recognizer
 
     def train_from_dataset(self) -> dict:
