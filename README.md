@@ -9,13 +9,13 @@ Desarrollado como proyecto academico para el Puerto de Manzanillo.
 
 ## Caracteristicas
 
--Reconocimiento facial en tiempo real con algoritmos clasicos de vision por computadora
--Funcionamiento completamente offline, sin dependencia de servicios cloud
--Enrolamiento facial guiado con validaciones automaticas (iluminacion, pose, lentes)
--Panel de administracion web para gestion de usuarios y monitoreo
--Modo kiosco para operacion en punto de acceso
--Cifrado de datos biometricos en reposo
--Control de acceso fisico mediante rele GPIO
+-Reconocimiento facial en tiempo real con algoritmos clasicos de vision por computadora.
+-Funcionamiento completamente offline, sin dependencia de servicios cloud.
+-Enrolamiento facial guiado con validaciones automaticas (iluminacion, pose, lentes).
+-Panel de administracion web para gestion de usuarios y monitoreo.
+-Modo kiosco para operacion en punto de acceso.
+-Cifrado de datos biometricos en reposo.
+-Control de acceso fisico mediante rele GPIO.
 
 ## Tecnologias utilizadas
 
