@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS muestras (
     usuario_id INTEGER NOT NULL,
     imagen_ref TEXT NOT NULL,
     pose_type TEXT NOT NULL DEFAULT 'frontal',
+    preprocess_mode TEXT NOT NULL DEFAULT 'legacy_bbox',
     fecha_captura DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
@@ -48,12 +49,13 @@ CREATE TABLE IF NOT EXISTS configuracion (
     umbral_confianza REAL NOT NULL,
     tiempo_apertura_seg INTEGER NOT NULL,
     max_intentos INTEGER NOT NULL,
+    support_phone TEXT NOT NULL DEFAULT '',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insertar configuración por defecto si no existe
-INSERT OR IGNORE INTO configuracion (id, umbral_confianza, tiempo_apertura_seg, max_intentos)
-VALUES (1, 60.0, 5, 3);
+INSERT OR IGNORE INTO configuracion (id, umbral_confianza, tiempo_apertura_seg, max_intentos, support_phone)
+VALUES (1, 60.0, 5, 3, '');
 
 -- =========================
 -- 5. Tabla administradores
@@ -90,6 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_accesos_fecha ON accesos(fecha);
 CREATE INDEX IF NOT EXISTS idx_accesos_usuario ON accesos(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_muestras_usuario ON muestras(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_muestras_pose ON muestras(pose_type);
+CREATE INDEX IF NOT EXISTS idx_muestras_preprocess ON muestras(preprocess_mode);
 
 -- =========================
 -- 7. Vista de auditoría administrativa

@@ -14,6 +14,7 @@ const newUserName = document.getElementById('newUserName');
 const createResult = document.getElementById('createResult');
 const trainBtn = document.getElementById('trainBtn');
 const trainResult = document.getElementById('trainResult');
+const purgeLegacySamplesBtn = document.getElementById('purgeLegacySamplesBtn');
 const manualOpenAdminBtn = document.getElementById('manualOpenAdminBtn');
 
 // Settings — config refs
@@ -27,6 +28,9 @@ const maxAttemptsValue = document.getElementById('maxAttemptsValue');
 const openSecStepper = document.getElementById('openSecStepper');
 const openSecValue = document.getElementById('openSecValue');
 const doorTimeSummary = document.getElementById('doorTimeSummary');
+const supportPhoneInput = document.getElementById('supportPhoneInput');
+const supportPhoneSummary = document.getElementById('supportPhoneSummary');
+const supportPhoneApplyBtn = document.getElementById('supportPhoneApplyBtn');
 
 // Settings — diagnostics
 const diagnosticsSummary = document.getElementById('diagnosticsSummary');
@@ -1178,6 +1182,9 @@ async function loadConfig() {
   if (maxAttemptsValue) maxAttemptsValue.textContent = cfg.max_intentos;
   if (openSecValue) openSecValue.textContent = cfg.tiempo_apertura_seg;
   if (doorTimeSummary) doorTimeSummary.textContent = `${cfg.tiempo_apertura_seg} ${cfg.tiempo_apertura_seg !== 1 ? tr('segundos') : tr('segundo')}`;
+  const supportPhone = String(cfg.support_phone || '').trim();
+  if (supportPhoneInput) supportPhoneInput.value = supportPhone;
+  if (supportPhoneSummary) supportPhoneSummary.textContent = supportPhone || tr('Sin teléfono');
 }
 
 async function saveConfig(patch = {}) {
@@ -1185,6 +1192,7 @@ async function saveConfig(patch = {}) {
   const umbral = Number(cfgThreshold?.value || 70);
   const intentos = Number(maxAttemptsValue?.textContent || 3);
   const segundos = Number(openSecValue?.textContent || 5);
+  const supportPhone = String(supportPhoneInput?.value || '').trim();
   try {
     await api('/api/config', {
       method: 'PUT',
@@ -1192,8 +1200,11 @@ async function saveConfig(patch = {}) {
         umbral_confianza: patch.umbral_confianza ?? umbral,
         tiempo_apertura_seg: patch.tiempo_apertura_seg ?? segundos,
         max_intentos: patch.max_intentos ?? intentos,
+        support_phone: patch.support_phone ?? supportPhone,
       }),
     });
+    const phoneSaved = String(patch.support_phone ?? supportPhone).trim();
+    if (supportPhoneSummary) supportPhoneSummary.textContent = phoneSaved || tr('Sin teléfono');
     showAdminToast({ text: 'Ajuste guardado', sub: 'Configuración aplicada', cls: 'success' });
   } catch (error) {
     console.error(error);
@@ -1457,6 +1468,37 @@ trainBtn?.addEventListener('click', async () => {
   }
 });
 
+purgeLegacySamplesBtn?.addEventListener('click', async () => {
+  const confirmed = await openAdminConfirm({
+    eyebrow: 'Recaptura limpia',
+    title: 'Borrar muestras faciales',
+    text: 'Se eliminaran las capturas faciales anteriores y el modelo entrenado. Las personas seguiran registradas, pero deberas capturar su rostro nuevamente.',
+    confirmLabel: 'Borrar muestras',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+  purgeLegacySamplesBtn.disabled = true;
+  showAdminToast({ text: 'Borrando muestras...', sub: 'Espera un momento', cls: 'processing', timeout: 12000 });
+  try {
+    const result = await api('/api/face-samples/purge-legacy', { method: 'POST' });
+    await Promise.all([loadUsers(), loadStatus()]);
+    if (trainResult) {
+      trainResult.textContent = `${result.deleted_samples || 0} ${tr('muestras eliminadas')}`;
+    }
+    showAdminToast({
+      text: 'Muestras borradas',
+      sub: `${result.deleted_samples || 0} ${tr('registros eliminados')}`,
+      cls: 'success',
+      timeout: 3600,
+    });
+  } catch (error) {
+    console.error(error);
+    showAdminToast({ text: 'No se pudo borrar', sub: getErrorMessage(error), cls: 'error', timeout: 3400 });
+  } finally {
+    purgeLegacySamplesBtn.disabled = false;
+  }
+});
+
 /* ── Settings: Preset segment ── */
 
 recogSegment?.addEventListener('click', (e) => {
@@ -1511,6 +1553,11 @@ applyThresholdBtn?.addEventListener('click', () => {
   if (!val || val < 1 || val > 200) return;
   applyPresetUI(val);
   debouncedSaveConfig({ umbral_confianza: val });
+});
+
+supportPhoneApplyBtn?.addEventListener('click', () => {
+  const phone = String(supportPhoneInput?.value || '').trim();
+  debouncedSaveConfig({ support_phone: phone });
 });
 
 manualOpenAdminBtn?.addEventListener('click', async () => {

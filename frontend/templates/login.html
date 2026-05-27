@@ -30,13 +30,13 @@
       <span class="sysid-desc" data-i18n>Control biométrico</span>
     </div>
 
-    <form class="login-card" action="/auth/login" method="post">
+    <form class="login-card" action="/auth/login" method="post" data-recovery-phone="{{ recovery_phone | default('+52 314 616 1661') | e }}">
       <span class="hud-corner hud-tl" aria-hidden="true"></span>
       <span class="hud-corner hud-tr" aria-hidden="true"></span>
       <span class="hud-corner hud-bl" aria-hidden="true"></span>
       <span class="hud-corner hud-br" aria-hidden="true"></span>
 
-      <div class="login-head">
+      <div class="login-head" data-login-auth-control>
         <div class="login-icon-badge" aria-hidden="true">
           <img class="osvium-logo-svg" src="/static/images/logo-white.svg" alt="Logo Osvium" aria-hidden="true">
           <span class="scan-ring r1"></span>
@@ -59,7 +59,7 @@
            Se envía oculto para mantener el contrato del endpoint /auth/login. -->
       <input type="hidden" name="username" value="{{ admin_user | e }}" autocomplete="username" />
 
-      <div class="field-group">
+      <div class="field-group" data-login-auth-control>
         <label for="password" class="label" data-i18n>Contraseña</label>
         <div class="input-wrap">
           <svg class="icon input-leading-icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#lock"></use></svg>
@@ -67,14 +67,24 @@
         </div>
       </div>
 
-      <div class="login-actions">
+      <div class="login-actions" data-login-auth-control>
         <button type="submit" class="btn btn-primary large-touch login-submit">
           <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#check-filled"></use></svg>
           <span data-i18n>Entrar</span>
         </button>
       </div>
 
-      <p class="login-recover" data-i18n-html>¿Olvidaste tu contraseña? Llama al <span class="login-recover__phone">314 161 1779</span> para recuperarla.</p>
+      <button class="login-recover-link" type="button" data-i18n>¿Olvidaste tu contraseña?</button>
+
+      <section class="login-recovery-view is-hidden" id="loginRecoveryPanel" hidden aria-live="polite">
+        <h2 data-i18n>Recuperar acceso</h2>
+        <p id="loginRecoveryText" data-i18n>Comunícate con el centro encargado para recuperar la contraseña de administración.</p>
+        <a id="loginRecoveryPhone" class="login-recovery-phone" href=""></a>
+        <button class="login-recovery-back" id="loginRecoveryBack" type="button">
+          <svg class="icon" aria-hidden="true"><use href="/static/icons/lucide/lucide-sprite.svg#chevron-left"></use></svg>
+          <span data-i18n>Volver a iniciar sesión</span>
+        </button>
+      </section>
     </form>
 
   </main>

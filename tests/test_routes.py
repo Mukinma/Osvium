@@ -107,6 +107,115 @@ def test_health_detallado_para_admin(client):
     assert "metrics" in response.json()
 
 
+def test_config_get_put_preserva_support_phone(client, monkeypatch):
+    saved_config = {
+        "umbral_confianza": 68.0,
+        "tiempo_apertura_seg": 4,
+        "max_intentos": 3,
+        "support_phone": "+52 55 0000 1111",
+    }
+
+    def fake_get_config():
+        return dict(saved_config)
+
+    def fake_update_config(umbral_confianza, tiempo_apertura_seg, max_intentos, support_phone):
+        next_phone = saved_config["support_phone"] if support_phone is None else str(support_phone)
+        saved_config.update(
+            {
+                "umbral_confianza": float(umbral_confianza),
+                "tiempo_apertura_seg": int(tiempo_apertura_seg),
+                "max_intentos": int(max_intentos),
+                "support_phone": next_phone,
+            }
+        )
+
+    monkeypatch.setattr(routes_module.db, "get_config", fake_get_config)
+    monkeypatch.setattr(routes_module.db, "update_config", fake_update_config)
+
+    csrf_token = _login_admin(client)
+
+    get_response = client.get("/api/config")
+    assert get_response.status_code == 200
+    assert get_response.json()["support_phone"] == "+52 55 0000 1111"
+
+    put_response = client.put(
+        "/api/config",
+        json={
+            "umbral_confianza": 81.0,
+            "tiempo_apertura_seg": 7,
+            "max_intentos": 4,
+            "support_phone": "+52 81 2222 3333",
+        },
+        headers=_csrf_headers(csrf_token),
+    )
+
+    assert put_response.status_code == 200
+    assert saved_config["umbral_confianza"] == 81.0
+    assert saved_config["tiempo_apertura_seg"] == 7
+    assert saved_config["max_intentos"] == 4
+    assert saved_config["support_phone"] == "+52 81 2222 3333"
+
+    put_without_phone = client.put(
+        "/api/config",
+        json={
+            "umbral_confianza": 79.0,
+            "tiempo_apertura_seg": 6,
+            "max_intentos": 2,
+        },
+        headers=_csrf_headers(csrf_token),
+    )
+
+    assert put_without_phone.status_code == 200
+    assert saved_config["support_phone"] == "+52 81 2222 3333"
+
+
+def test_admin_login_template_uses_manufacturer_recovery_phone(client, monkeypatch):
+    monkeypatch.setattr(
+        routes_module.db,
+        "get_config",
+        lambda: {
+            "umbral_confianza": 70.0,
+            "tiempo_apertura_seg": 5,
+            "max_intentos": 3,
+            "support_phone": "+52 55 7777 8888",
+        },
+    )
+
+    response = client.get("/admin")
+
+    assert response.status_code == 200
+    assert 'data-recovery-phone="+52 314 616 1661"' in response.text
+    assert "+52 55 7777 8888" not in response.text
+    assert "login-recovery-view" in response.text
+    assert "login-recovery-panel" not in response.text
+
+
+def test_purge_legacy_face_samples_endpoint_requires_admin_and_csrf(client, monkeypatch):
+    calls = []
+
+    def fake_purge():
+        calls.append(True)
+        return {"ok": True, "deleted_files": 3, "deleted_samples": 3, "model_removed": True}
+
+    monkeypatch.setattr(client.app.state.service, "purge_legacy_face_samples", fake_purge, raising=False)
+
+    unauthorized = client.post("/api/face-samples/purge-legacy")
+    assert unauthorized.status_code == 401
+
+    csrf_token = _login_admin(client)
+    forbidden = client.post("/api/face-samples/purge-legacy")
+    assert forbidden.status_code == 403
+
+    response = client.post(
+        "/api/face-samples/purge-legacy",
+        headers=_csrf_headers(csrf_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "deleted_files": 3, "deleted_samples": 3, "model_removed": True}
+    assert calls == [True]
+
+
 def test_restart_deshabilitado_en_produccion(client):
     routes_module.config.debug = False
     csrf_token = _login_admin(client)

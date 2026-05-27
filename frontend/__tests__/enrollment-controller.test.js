@@ -97,6 +97,22 @@ function createResponse(data, ok = true, status = ok ? 200 : 400) {
 }
 
 function createDom({ initialView = 'personas', fetchImpl, confirmImpl = () => true } = {}) {
+  const canvasContext = {
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    ellipse: vi.fn(),
+    stroke: vi.fn(),
+    strokeRect: vi.fn(),
+    fill: vi.fn(),
+    closePath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
+    setLineDash: vi.fn(),
+  };
   const dom = new JSDOM(
     `<!doctype html>
     <html lang="es">
@@ -186,21 +202,7 @@ function createDom({ initialView = 'personas', fetchImpl, confirmImpl = () => tr
   );
 
   const { window } = dom;
-  window.HTMLCanvasElement.prototype.getContext = () => ({
-    clearRect() {},
-    save() {},
-    restore() {},
-    beginPath() {},
-    ellipse() {},
-    stroke() {},
-    fill() {},
-    closePath() {},
-    moveTo() {},
-    lineTo() {},
-    translate() {},
-    rotate() {},
-    setLineDash() {},
-  });
+  window.HTMLCanvasElement.prototype.getContext = () => canvasContext;
   window.requestAnimationFrame = (callback) => window.setTimeout(callback, 0);
   window.cancelAnimationFrame = (id) => window.clearTimeout(id);
   window.showAdminToast = vi.fn();
@@ -218,6 +220,7 @@ function createDom({ initialView = 'personas', fetchImpl, confirmImpl = () => tr
     dom,
     window,
     document: window.document,
+    canvasContext,
   };
 }
 
@@ -231,6 +234,7 @@ async function flushAsync() {
 afterEach(() => {
   activeWindows.forEach((windowRef) => windowRef.close());
   activeWindows.clear();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -291,7 +295,7 @@ describe('enrollment controller', () => {
     expect(secondStatusCalls).toBeGreaterThan(firstStatusCalls);
   });
 
-  it('trains and finishes the session only after confirmation in completed review', async () => {
+  it('auto-trains and finishes the session in completed review', async () => {
     const completedSnapshot = buildCompletedSnapshot();
     const fetchImpl = vi.fn(async (url) => {
       if (url === '/api/users') {
@@ -318,10 +322,10 @@ describe('enrollment controller', () => {
 
     expect(document.getElementById('enrollCompletion').classList.contains('is-hidden')).toBe(false);
 
-    document.getElementById('enrollTrainBtn').click();
+    await new Promise((resolve) => setTimeout(resolve, 1510));
     await flushAsync();
 
-    expect(window.confirm).toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
     expect(fetchImpl).toHaveBeenCalledWith('/api/train', expect.objectContaining({ method: 'POST', credentials: 'same-origin' }));
     expect(fetchImpl).toHaveBeenCalledWith('/api/enrollment/finish', expect.objectContaining({ method: 'POST', credentials: 'same-origin' }));
     expect(window.showPersonasListMode).toHaveBeenCalled();
@@ -357,5 +361,35 @@ describe('enrollment controller', () => {
     }));
     expect(document.getElementById('enrollInstructionsPanel').hidden).toBe(true);
     expect(document.getElementById('enrollSummaryUser').textContent).toContain('Ada Lovelace');
+  });
+
+  it('draws a dynamic face box instead of the fixed centered oval', async () => {
+    const activeSnapshot = {
+      ...buildActiveSnapshot(),
+      guidance: {
+        ...buildActiveSnapshot().guidance,
+        face_bbox: { x: 0.18, y: 0.22, w: 0.24, h: 0.34 },
+      },
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/users') {
+        return createResponse([{ id: 7, nombre: 'Ada Lovelace' }]);
+      }
+      if (url === '/api/status') {
+        return createResponse({ camera: 'online', model: 'loaded' });
+      }
+      if (url === '/api/enrollment/status') {
+        return createResponse(activeSnapshot);
+      }
+      return createResponse({}, false, 404);
+    });
+
+    const { window, canvasContext } = createDom({ fetchImpl });
+    window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
+    await flushAsync();
+    await flushAsync();
+
+    expect(canvasContext.ellipse).not.toHaveBeenCalled();
+    expect(canvasContext.strokeRect).toHaveBeenCalled();
   });
 });

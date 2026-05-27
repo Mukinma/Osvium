@@ -10,7 +10,6 @@ const ADMIN_SOURCE = readFileSync(
 
 const activeWindows = new Set();
 
-<<<<<<< HEAD
 function createResponse(data, ok = true, status = ok ? 200 : 400) {
   return {
     ok,
@@ -20,36 +19,15 @@ function createResponse(data, ok = true, status = ok ? 200 : 400) {
     },
     async text() {
       return typeof data === 'string' ? data : JSON.stringify(data);
-=======
-function responseJson(payload, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    async json() {
-      return payload;
-    },
-    async text() {
-      return JSON.stringify(payload);
->>>>>>> origin/Cris
     },
   };
 }
 
-<<<<<<< HEAD
-function createAdminDom({ users = [] } = {}) {
-=======
-async function flushAsyncWork() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function createAdminDom({ users = [] } = {}) {
->>>>>>> origin/Cris
+function createAdminDom({ users = [], config = {} } = {}) {
   const dom = new JSDOM(
     `<!doctype html>
     <html lang="es">
       <head>
-<<<<<<< HEAD
         <meta name="csrf-token" content="csrf-token" />
         <meta name="admin-user" content="admin" />
       </head>
@@ -87,9 +65,13 @@ async function createAdminDom({ users = [] } = {}) {
           <div id="recogSegment"></div>
           <span id="recogPresetSummary"></span><span id="recogCustomValue"></span>
           <span id="maxAttemptsValue"></span><span id="openSecValue"></span><span id="doorTimeSummary"></span>
+          <input id="supportPhoneInput" />
+          <span id="supportPhoneSummary"></span>
+          <button id="supportPhoneApplyBtn" type="button"></button>
           <span id="diagnosticsSummary"></span><span id="diagnosticsRootIcon"></span><div id="diagnosticsDetailList"></div>
           <span id="accountDisplayName"></span><span id="accountUsernameSummary"></span>
           <button id="manualOpenAdminBtn" type="button"></button>
+          <button id="purgeLegacySamplesBtn" type="button"></button>
 
           <div id="adminToast" class="is-hidden"><span id="adminToastText"></span><span id="adminToastSub"></span></div>
           <div id="adminDialog" class="is-hidden" aria-hidden="true">
@@ -100,24 +82,6 @@ async function createAdminDom({ users = [] } = {}) {
             </section>
           </div>
         </main>
-=======
-        <meta name="csrf-token" content="test-csrf" />
-        <meta name="admin-user" content="admin" />
-      </head>
-      <body>
-        <section id="view-personas">
-          <h1 id="personasTitle">Personas</h1>
-          <p id="personasSubtitle"></p>
-          <p id="personasSummary"></p>
-          <div id="personasSearchWrap">
-            <input id="userSearch" type="text" />
-          </div>
-          <input id="newUserName" type="text" />
-          <button id="createUserBtn" type="button"></button>
-          <p id="createResult" hidden></p>
-          <div id="usersList"></div>
-        </section>
->>>>>>> origin/Cris
       </body>
     </html>`,
     {
@@ -126,12 +90,21 @@ async function createAdminDom({ users = [] } = {}) {
     },
   );
 
-<<<<<<< HEAD
   const { window } = dom;
+  const savedConfig = {
+    umbral_confianza: 70,
+    tiempo_apertura_seg: 5,
+    max_intentos: 3,
+    support_phone: '',
+    ...config,
+  };
+
   window.i18n = { t: (value) => value };
+  window.CameraPITheme = { initTheme: vi.fn(), bindToggleButtons: vi.fn() };
   window.CameraPIAdminLayout = { navigateToView: vi.fn() };
-  window.CameraPIEnrollment = { startForUser: vi.fn(async () => {}) };
+  window.CameraPIEnrollment = { reset: vi.fn(), startForUser: vi.fn(async () => {}) };
   window.requestAnimationFrame = (callback) => window.setTimeout(callback, 0);
+  window.setInterval = vi.fn();
   window.fetch = vi.fn(async (url, options = {}) => {
     if (url === '/api/users' && options.method === 'POST') return createResponse({ id: 12 });
     if (url === '/api/users') return createResponse(users);
@@ -142,7 +115,14 @@ async function createAdminDom({ users = [] } = {}) {
     }
     if (url === '/api/access-logs?limit=200') return createResponse([]);
     if (url === '/api/status') return createResponse({ camera: 'online', model: 'loaded', door: 'ready' });
-    if (url === '/api/config') return createResponse({ umbral_confianza: 70, max_intentos: 3, tiempo_apertura_seg: 5 });
+    if (url === '/api/config' && options.method === 'PUT') {
+      Object.assign(savedConfig, JSON.parse(options.body || '{}'));
+      return createResponse(savedConfig);
+    }
+    if (url === '/api/config') return createResponse(savedConfig);
+    if (url === '/api/face-samples/purge-legacy' && options.method === 'POST') {
+      return createResponse({ ok: true, deleted_files: 4, deleted_samples: 4, model_removed: true });
+    }
     if (url === '/api/system/diagnostics') return createResponse({ summary: 'Todo en orden', all_ok: true, checks: {} });
     return createResponse({}, false, 404);
   });
@@ -160,38 +140,10 @@ async function flushAsync() {
 
 afterEach(() => {
   activeWindows.forEach((windowRef) => windowRef.close());
-=======
-  const endpoints = new Map([
-    ['/api/users', users],
-    ['/api/access-logs?limit=200', []],
-    ['/api/status', { camera: 'online', model: 'loaded', door: 'ready' }],
-    ['/api/config', { umbral_confianza: 70, tiempo_apertura_seg: 5, max_intentos: 3 }],
-    ['/api/system/diagnostics', { summary: 'Todo listo', all_ok: true, checks: {} }],
-  ]);
-
-  dom.window.fetch = vi.fn(async (url) => responseJson(endpoints.get(String(url)) ?? {}));
-  dom.window.setInterval = vi.fn();
-  dom.window.requestAnimationFrame = (callback) => callback();
-  dom.window.CameraPITheme = {
-    initTheme: vi.fn(),
-    bindToggleButtons: vi.fn(),
-  };
-
-  dom.window.eval(ADMIN_SOURCE);
-  activeWindows.add(dom.window);
-  await flushAsyncWork();
-
-  return dom;
-}
-
-afterEach(() => {
-  activeWindows.forEach((windowObject) => windowObject.close());
->>>>>>> origin/Cris
   activeWindows.clear();
   vi.restoreAllMocks();
 });
 
-<<<<<<< HEAD
 describe('admin personas redesigned UX', () => {
   it('renders visual person cards with thumbnail and primary action instead of a table', async () => {
     const { document } = createAdminDom({
@@ -259,60 +211,56 @@ describe('admin personas redesigned UX', () => {
     expect(detailActions.textContent).not.toContain('Entrenar');
     expect([...document.querySelectorAll('#personDetailPanel button')]
       .filter((button) => button.textContent.includes('Activar'))).toHaveLength(1);
-=======
-describe('admin personas view', () => {
-  it('renders a guided first-use empty state instead of an empty table', async () => {
-    const dom = await createAdminDom({ users: [] });
-    const { document } = dom.window;
-
-    expect(document.getElementById('personasTitle')?.textContent).toBe('Agrega la primera persona');
-    expect(document.getElementById('personasSubtitle')?.textContent).toContain('Empieza con el nombre');
-    expect(document.getElementById('personasSearchWrap')?.hidden).toBe(true);
-    expect(document.querySelector('#usersList table')).toBeNull();
-    expect(document.querySelector('.personas-empty-state')?.textContent).toContain('Aún no hay personas');
   });
 
-  it('renders registered people as action-led cards without status badges', async () => {
-    const dom = await createAdminDom({
-      users: [
-        { id: 12, nombre: 'María López', activo: 1 },
-        { id: 13, nombre: 'Jorge Pérez', activo: 0 },
-      ],
+  it('loads and saves the configurable support phone', async () => {
+    const { document, window } = createAdminDom({
+      config: { support_phone: '+52 55 1111 2222' },
     });
-    const { document } = dom.window;
+    await flushAsync();
 
-    const cards = document.querySelectorAll('.person-card');
-    expect(cards).toHaveLength(2);
-    expect(document.querySelector('#usersList table')).toBeNull();
-    expect(document.querySelector('#usersList .badge')).toBeNull();
+    expect(document.getElementById('supportPhoneInput').value).toBe('+52 55 1111 2222');
+    expect(document.getElementById('supportPhoneSummary').textContent).toBe('+52 55 1111 2222');
 
-    expect(cards[0].textContent).toContain('María López');
-    expect(cards[0].textContent).toContain('Activa · ID 12');
-    expect(cards[0].querySelector('.person-card__primary')?.textContent).toContain('Registrar rostro');
-    expect(cards[0].querySelector('.person-card__more')?.getAttribute('aria-label')).toBe('Más acciones para María López');
+    document.getElementById('supportPhoneInput').value = '+52 55 3333 4444';
+    document.getElementById('supportPhoneApplyBtn').click();
+    await new Promise((resolve) => setTimeout(resolve, 410));
+    await flushAsync();
 
-    expect(cards[1].textContent).toContain('Jorge Pérez');
-    expect(cards[1].textContent).toContain('Inactiva · ID 13');
-    expect(cards[1].querySelector('.person-card__primary')?.textContent).toContain('Activar persona');
+    expect(window.fetch).toHaveBeenCalledWith('/api/config', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({
+        umbral_confianza: 70,
+        tiempo_apertura_seg: 5,
+        max_intentos: 3,
+        support_phone: '+52 55 3333 4444',
+      }),
+    }));
+    expect(document.getElementById('supportPhoneSummary').textContent).toBe('+52 55 3333 4444');
   });
 
-  it('keeps card rendering when search filters the people list', async () => {
-    const dom = await createAdminDom({
-      users: [
-        { id: 12, nombre: 'María López', activo: 1 },
-        { id: 13, nombre: 'Jorge Pérez', activo: 1 },
-      ],
-    });
-    const { document, Event } = dom.window;
-    const search = document.getElementById('userSearch');
+  it('confirms and purges legacy face samples from maintenance', async () => {
+    const { document, window } = createAdminDom();
+    await flushAsync();
 
-    search.value = 'jorge';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
+    document.getElementById('purgeLegacySamplesBtn').click();
+    await flushAsync();
 
-    const cards = document.querySelectorAll('.person-card');
-    expect(cards).toHaveLength(1);
-    expect(cards[0].textContent).toContain('Jorge Pérez');
-    expect(document.querySelector('#usersList table')).toBeNull();
->>>>>>> origin/Cris
+    expect(document.getElementById('adminDialog').classList.contains('is-hidden')).toBe(false);
+    expect(document.getElementById('adminDialogTitle').textContent).toContain('Borrar muestras');
+    expect(window.fetch).not.toHaveBeenCalledWith('/api/face-samples/purge-legacy', expect.anything());
+
+    document.getElementById('adminDialogConfirm').click();
+    await flushAsync();
+    await flushAsync();
+
+    expect(window.fetch).toHaveBeenCalledWith('/api/face-samples/purge-legacy', expect.objectContaining({
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: expect.objectContaining({ 'x-csrf-token': 'csrf-token' }),
+    }));
+    expect(window.fetch).toHaveBeenCalledWith('/api/users', expect.any(Object));
+    expect(window.fetch).toHaveBeenCalledWith('/api/status', expect.any(Object));
+    expect(document.getElementById('adminToastText').textContent).toBe('Muestras borradas');
   });
 });

@@ -46,6 +46,9 @@
     'sistema-puerta': {
       title: 'Puerta',
     },
+    'sistema-soporte': {
+      title: 'Soporte',
+    },
     'sistema-mantenimiento': {
       title: 'Mantenimiento',
     },

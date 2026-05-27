@@ -82,33 +82,6 @@
             <img id="videoFeed" class="kiosk-camera__feed" src="" data-stream-src="/api/stream" alt="Cámara en vivo" />
 
             <div id="faceGuide" class="face-guide is-idle" aria-hidden="true">
-              <svg class="face-guide__silhouette" viewBox="0 0 400 520" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Fondo negro suave redondeado para contraste con iluminación real -->
-                <path class="face-guide__backdrop" d="
-                  M200 30
-                  C 100 30, 50 120, 50 210
-                  C 50 290, 70 340, 100 380
-                  L 130 420
-                  Q 200 480, 270 420
-                  L 300 380
-                  C 330 340, 350 290, 350 210
-                  C 350 120, 300 30, 200 30 Z"
-                  fill="rgba(0,0,0,0.25)" stroke="none"/>
-                <!-- Marco principal — hereda color de .face-guide via currentColor -->
-                <path class="face-guide__stroke" d="
-                  M200 30
-                  C 100 30, 50 120, 50 210
-                  C 50 290, 70 340, 100 380
-                  L 130 420
-                  Q 200 480, 270 420
-                  L 300 380
-                  C 330 340, 350 290, 350 210
-                  C 350 120, 300 30, 200 30 Z"
-                  stroke="currentColor" stroke-width="4" fill="none"
-                  stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-
-              <!-- Flechas direccionales — aparecen cuando el rostro se desplaza -->
               <div class="face-arrow face-arrow--left" id="faceArrowLeft" aria-hidden="true">
                 <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M20 6 L10 16 L20 26" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -131,16 +104,32 @@
               </div>
             </div>
 
+            <div id="faceBoxOverlay" class="face-box-overlay" aria-hidden="true">
+              <div id="primaryFaceBox" class="face-box is-hidden"></div>
+            </div>
+
+            <div id="welcomeOverlay" class="welcome-overlay is-hidden" aria-live="polite" aria-atomic="true">
+              <svg id="welcomeCheckIcon" class="welcome-overlay__icon is-hidden" aria-hidden="true">
+                <use href="/static/icons/lucide/lucide-sprite.svg#circle-check"></use>
+              </svg>
+              <span id="welcomeTitle">Adelante</span>
+              <strong id="welcomeName"></strong>
+            </div>
+
             <div id="faceIndicator" class="face-indicator idle" aria-hidden="true" hidden></div>
           </div>
         </div>
 
         <aside class="kiosk-info" id="infoPanel">
+          <svg id="accessReceiptIcon" class="kiosk-info__receipt-icon is-hidden" aria-hidden="true">
+            <use href="/static/icons/lucide/lucide-sprite.svg#circle-check"></use>
+          </svg>
           <div class="kiosk-info__header">
             <h1 class="kiosk-info__title" id="infoTitle" data-i18n>Validando identidad</h1>
             <p class="kiosk-info__desc" id="infoDesc" data-i18n>
               Espera un momento mientras verificamos tu acceso
             </p>
+            <p class="kiosk-info__meta" id="accessReceiptMeta" aria-live="polite"></p>
           </div>
           
           <div class="kiosk-info__footer">
@@ -153,6 +142,16 @@
 
       </div>
     </main>
+
+    <button id="supportHelpButton" class="support-help-button is-hidden" type="button">¿Necesitas ayuda?</button>
+    <div id="supportHelpDialog" class="support-help-dialog is-hidden" aria-hidden="true">
+      <button id="supportHelpClose" class="support-help-dialog__backdrop" type="button" aria-label="Cerrar ayuda"></button>
+      <section class="support-help-dialog__panel" role="dialog" aria-modal="true" aria-label="Ayuda">
+        <span class="support-help-dialog__label">Centro de soporte</span>
+        <p id="supportHelpMessage" class="support-help-dialog__message">En caso de no poder acceder debido a problemas de reconocimiento, llama al departamento encargado.</p>
+        <strong id="supportHelpPhone"></strong>
+      </section>
+    </div>
   </div>
 
   <script src="/static/js/i18n.js?v={{ asset_version }}"></script>

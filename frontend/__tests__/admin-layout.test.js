@@ -136,6 +136,7 @@ function createAdminDom({
             <section class="admin-view" id="view-enrolamiento" hidden></section>
             <section class="admin-view" id="view-accesos" hidden></section>
             <section class="admin-view" id="view-sistema" hidden></section>
+            <section class="admin-view" id="view-sistema-soporte" hidden></section>
           </main>
         </div>
 
@@ -236,5 +237,24 @@ describe('admin layout responsive shell', () => {
     expect(personasButton.getAttribute('aria-current')).toBe('page');
     expect(resumenButton.classList.contains('is-active')).toBe(false);
     expect(resumenButton.hasAttribute('aria-current')).toBe(false);
+  });
+
+  it('opens the soporte system subview from the hash', () => {
+    const { document, window } = createAdminDom({
+      hash: '#sistema-soporte',
+      drawerMatches: true,
+      mobileMatches: true,
+    });
+
+    const soporteSection = document.getElementById('view-sistema-soporte');
+    const resumenSection = document.getElementById('view-resumen');
+    const sistemaButton = document.querySelector('[data-view="sistema"]');
+
+    expect(window.CameraPIAdminLayout.getCurrentView()).toBe('sistema-soporte');
+    expect(soporteSection.hidden).toBe(false);
+    expect(soporteSection.classList.contains('is-active')).toBe(true);
+    expect(resumenSection.hidden).toBe(true);
+    expect(sistemaButton.classList.contains('is-active')).toBe(true);
+    expect(sistemaButton.getAttribute('aria-current')).toBe('page');
   });
 });

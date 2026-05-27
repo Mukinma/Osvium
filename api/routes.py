@@ -23,6 +23,7 @@ auth_logger = logging.getLogger("camerapi.auth")
 logger = logging.getLogger("camerapi.routes")
 CSRF_SESSION_KEY = "csrf_token"
 CSRF_HEADER = "x-csrf-token"
+MANUFACTURER_SUPPORT_PHONE = "+52 314 616 1661"
 
 
 def _template_context(request: Request, **extra: object) -> dict[str, object]:
@@ -97,6 +98,7 @@ class ConfigUpdate(BaseModel):
     umbral_confianza: float = Field(ge=1, le=200)
     tiempo_apertura_seg: int = Field(ge=1, le=20)
     max_intentos: int = Field(ge=1, le=20)
+    support_phone: Optional[str] = Field(default=None, max_length=64)
 
 
 class ChangePasswordPayload(BaseModel):
@@ -142,6 +144,7 @@ def admin(request: Request):
                 request,
                 login_error=has_error,
                 admin_user=config.admin_user,
+                recovery_phone=MANUFACTURER_SUPPORT_PHONE,
             ),
         )
     return request.app.state.templates.TemplateResponse(
@@ -235,7 +238,13 @@ def frame_snapshot(request: Request):
 @router.get("/api/status")
 def status(request: Request):
     _session_required(request)
-    return request.app.state.service.get_status()
+    payload = request.app.state.service.get_status()
+    try:
+        payload["support_phone"] = str(db.get_config().get("support_phone") or "")
+    except Exception:
+        logger.exception("status_support_phone_failed")
+        payload["support_phone"] = ""
+    return payload
 
 
 @router.post("/api/recognize")
@@ -358,7 +367,7 @@ def capture_samples(user_id: int, request: Request, count: int = 30):
         attempts += 1
         path = service.capture_sample(user_id, saved + 1)
         if path:
-            db.insert_sample(user_id, path)
+            db.insert_sample(user_id, path, preprocess_mode=config.sface_preprocess_mode)
             saved += 1
         time.sleep(0.05)
     return {"saved": saved, "requested": count}
@@ -370,7 +379,10 @@ def train(request: Request):
     service = request.app.state.service
 
     with service.analysis_lock:
-        result = service.trainer.train_from_dataset()
+        try:
+            result = service.trainer.train_from_dataset()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
         try:
             reloaded = service.recognizer.load_model(config.model_path)
@@ -414,6 +426,12 @@ def train(request: Request):
     return {**result, "reloaded": True}
 
 
+@router.post("/api/face-samples/purge-legacy")
+def purge_legacy_face_samples(request: Request):
+    _admin_write_required(request)
+    return request.app.state.service.purge_legacy_face_samples()
+
+
 @router.get("/api/config")
 def get_config(request: Request):
     _admin_required(request)
@@ -423,7 +441,12 @@ def get_config(request: Request):
 @router.put("/api/config")
 def update_config(payload: ConfigUpdate, request: Request):
     _admin_write_required(request)
-    db.update_config(payload.umbral_confianza, payload.tiempo_apertura_seg, payload.max_intentos)
+    db.update_config(
+        payload.umbral_confianza,
+        payload.tiempo_apertura_seg,
+        payload.max_intentos,
+        payload.support_phone,
+    )
     return {"ok": True}
 
 
