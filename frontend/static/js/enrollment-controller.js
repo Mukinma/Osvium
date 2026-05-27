@@ -110,7 +110,7 @@
       })),
       guidance: {
         instruction: 'Selecciona una persona para iniciar',
-        hint: 'Prepara la iluminacion y centra el rostro antes de comenzar.',
+        hint: 'Prepara la iluminacion y deja el rostro visible antes de comenzar.',
         arrow: null,
         hold_progress: 0,
         pose_matched: false,
@@ -148,8 +148,8 @@
 
   function resizeCanvas() {
     const rect = viewport.getBoundingClientRect();
-    overlay.width = rect.width;
-    overlay.height = rect.height;
+    overlay.width = rect.width || viewport.clientWidth || overlay.width || 640;
+    overlay.height = rect.height || viewport.clientHeight || overlay.height || 480;
   }
 
   function getCsrfToken() {
@@ -329,6 +329,34 @@
     ctx.restore();
   }
 
+  function drawDynamicFaceBox(ctx, width, height, bbox, guidance) {
+    const x = Number(bbox.x || 0) * width;
+    const y = Number(bbox.y || 0) * height;
+    const w = Number(bbox.w || 0) * width;
+    const h = Number(bbox.h || 0) * height;
+    if (w <= 0 || h <= 0) return null;
+
+    ctx.save();
+    if (guidance.multiple_faces) {
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.84)';
+      ctx.shadowColor = 'rgba(239, 68, 68, 0.38)';
+    } else if (!guidance.brightness_ok) {
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.82)';
+      ctx.shadowColor = 'rgba(245, 158, 11, 0.34)';
+    } else if (guidance.pose_matched) {
+      ctx.strokeStyle = 'rgba(34, 197, 94, 0.86)';
+      ctx.shadowColor = 'rgba(34, 197, 94, 0.42)';
+    } else {
+      ctx.strokeStyle = 'rgba(125, 211, 252, 0.86)';
+      ctx.shadowColor = 'rgba(14, 165, 233, 0.34)';
+    }
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 14;
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+    return { x, y, w, h };
+  }
+
   function drawOverlay() {
     if (!canvasCtx) return;
     resizeCanvas();
@@ -341,64 +369,24 @@
 
     if (!isActivePhase() || !guidance) return;
 
-    const cx = width * 0.5;
-    const cy = height * 0.42;
-    const r = Math.min(width, height) * 0.28;
+    const drawnBox = guidance.face_bbox
+      ? drawDynamicFaceBox(ctx, width, height, guidance.face_bbox, guidance)
+      : null;
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, r, r, 0, 0, Math.PI * 2);
-
-    if (guidance.multiple_faces) {
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.78)';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = 'rgba(239, 68, 68, 0.36)';
-      ctx.shadowBlur = 14;
-    } else if (!guidance.face_detected) {
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.42)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 6]);
-    } else if (!guidance.brightness_ok) {
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.78)';
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.32)';
-      ctx.shadowBlur = 10;
-    } else if (guidance.pose_matched) {
-      if (enrollmentStatus.state === 'holding' || enrollmentStatus.state === 'capturing') {
-        ctx.strokeStyle = 'rgba(34, 197, 94, 0.82)';
-        ctx.lineWidth = 3;
-        ctx.shadowColor = 'rgba(34, 197, 94, 0.4)';
-        ctx.shadowBlur = 16;
-      } else {
-        ctx.strokeStyle = 'rgba(91, 140, 255, 0.72)';
-        ctx.lineWidth = 2.5;
-        ctx.shadowColor = 'rgba(91, 140, 255, 0.3)';
-        ctx.shadowBlur = 12;
-      }
-    } else {
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.72)';
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.22)';
-      ctx.shadowBlur = 10;
-    }
-
-    ctx.stroke();
-    ctx.restore();
-
-    if (enrollmentStatus.state === 'holding' && guidance.hold_progress > 0) {
+    if (drawnBox && enrollmentStatus.state === 'holding' && guidance.hold_progress > 0) {
       ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, r + 6, r + 6, 0, -Math.PI / 2, -Math.PI / 2 + (guidance.hold_progress * Math.PI * 2));
       ctx.strokeStyle = 'rgba(34, 197, 94, 0.92)';
       ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
       ctx.shadowColor = 'rgba(34, 197, 94, 0.5)';
       ctx.shadowBlur = 10;
-      ctx.stroke();
+      ctx.strokeRect(drawnBox.x - 4, drawnBox.y - 4, drawnBox.w + 8, drawnBox.h + 8);
       ctx.restore();
     }
 
-    if (guidance.arrow && !guidance.pose_matched && guidance.face_detected && !guidance.multiple_faces) {
+    if (drawnBox && guidance.arrow && !guidance.pose_matched && guidance.face_detected && !guidance.multiple_faces) {
+      const cx = drawnBox.x + drawnBox.w / 2;
+      const cy = drawnBox.y + drawnBox.h / 2;
+      const r = Math.max(drawnBox.w, drawnBox.h) / 2;
       drawArrow(ctx, cx, cy, r, r, guidance.arrow);
     }
   }
@@ -739,8 +727,8 @@
 
     if (faceWarningText) {
       faceWarningText.textContent = enrollmentStatus.state === 'face_lost'
-        ? 'Centra tu rostro en la guia'
-        : 'Mantente dentro de la guia para continuar';
+        ? 'Rostro no visible'
+        : 'Mantén el rostro visible para continuar';
     }
 
     faceWarning?.classList.toggle('is-hidden', !showFace);

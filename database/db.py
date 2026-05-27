@@ -100,6 +100,26 @@ class Database:
                         sql_to_execute,
                         flags=re.IGNORECASE,
                     )
+                has_preprocess_before = "preprocess_mode" in muestras_cols_before
+                if not has_preprocess_before:
+                    sql_to_execute = re.sub(
+                        r"CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+idx_muestras_preprocess\s+ON\s+muestras\s*\(\s*preprocess_mode\s*\)\s*;",
+                        "",
+                        sql_to_execute,
+                        flags=re.IGNORECASE,
+                    )
+
+                configuracion_cols_before = {
+                    row["name"]
+                    for row in conn.execute("PRAGMA table_info(configuracion);").fetchall()
+                }
+                if configuracion_cols_before and "support_phone" not in configuracion_cols_before:
+                    sql_to_execute = re.sub(
+                        r"INSERT\s+OR\s+IGNORE\s+INTO\s+configuracion\s*\(\s*id\s*,\s*umbral_confianza\s*,\s*tiempo_apertura_seg\s*,\s*max_intentos\s*,\s*support_phone\s*\)\s*VALUES\s*\(\s*1\s*,\s*60\.0\s*,\s*5\s*,\s*3\s*,\s*''\s*\)\s*;",
+                        "INSERT OR IGNORE INTO configuracion (id, umbral_confianza, tiempo_apertura_seg, max_intentos) VALUES (1, 60.0, 5, 3);",
+                        sql_to_execute,
+                        flags=re.IGNORECASE,
+                    )
 
                 conn.executescript(sql_to_execute)
 
@@ -113,10 +133,28 @@ class Database:
                         "ALTER TABLE muestras ADD COLUMN pose_type TEXT DEFAULT 'frontal';"
                     )
                     logger.info("migration_applied added_column=pose_type table=muestras")
+                if "preprocess_mode" not in muestras_cols:
+                    conn.execute(
+                        "ALTER TABLE muestras ADD COLUMN preprocess_mode TEXT NOT NULL DEFAULT 'legacy_bbox';"
+                    )
+                    logger.info("migration_applied added_column=preprocess_mode table=muestras")
 
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_muestras_pose ON muestras(pose_type);"
                 )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_muestras_preprocess ON muestras(preprocess_mode);"
+                )
+
+                configuracion_cols = {
+                    row["name"]
+                    for row in conn.execute("PRAGMA table_info(configuracion);").fetchall()
+                }
+                if "support_phone" not in configuracion_cols:
+                    conn.execute(
+                        "ALTER TABLE configuracion ADD COLUMN support_phone TEXT NOT NULL DEFAULT '';"
+                    )
+                    logger.info("migration_applied added_column=support_phone table=configuracion")
         except Exception:
             logger.exception("db_init_failed schema_path=%s", schema_file)
             raise
@@ -168,27 +206,46 @@ class Database:
 
     def get_config(self) -> dict[str, Any]:
         row = self.fetch_one(
-            "SELECT umbral_confianza, tiempo_apertura_seg, max_intentos FROM configuracion WHERE id=1"
+            "SELECT umbral_confianza, tiempo_apertura_seg, max_intentos, support_phone FROM configuracion WHERE id=1"
         )
         if not row:
             return {
                 "umbral_confianza": float(config.default_confidence_threshold),
                 "tiempo_apertura_seg": int(config.default_open_seconds),
                 "max_intentos": int(config.default_max_attempts),
+                "support_phone": "",
             }
         return dict(row)
 
-    def update_config(self, umbral_confianza: float, tiempo_apertura_seg: int, max_intentos: int) -> None:
+    def update_config(
+        self,
+        umbral_confianza: float,
+        tiempo_apertura_seg: int,
+        max_intentos: int,
+        support_phone: Optional[str] = None,
+    ) -> None:
         if not (1.0 <= float(umbral_confianza) <= 200.0):
             raise ValueError("umbral_confianza fuera de rango 1..200")
         if not (1 <= int(tiempo_apertura_seg) <= 30):
             raise ValueError("tiempo_apertura_seg fuera de rango 1..30")
         if not (1 <= int(max_intentos) <= 10):
             raise ValueError("max_intentos fuera de rango 1..10")
+        if support_phone is None:
+            support_phone_norm = str(self.get_config().get("support_phone") or "")
+        else:
+            support_phone_norm = str(support_phone or "").strip()
+        if len(support_phone_norm) > 64:
+            raise ValueError("support_phone fuera de rango 0..64")
+        if support_phone_norm and not re.match(r"^[0-9+().\-\s]+$", support_phone_norm):
+            raise ValueError("support_phone contiene caracteres inválidos")
 
         self.execute(
-            "UPDATE configuracion SET umbral_confianza=?, tiempo_apertura_seg=?, max_intentos=? WHERE id=1",
-            (float(umbral_confianza), int(tiempo_apertura_seg), int(max_intentos)),
+            """
+            UPDATE configuracion
+            SET umbral_confianza=?, tiempo_apertura_seg=?, max_intentos=?, support_phone=?
+            WHERE id=1
+            """,
+            (float(umbral_confianza), int(tiempo_apertura_seg), int(max_intentos), support_phone_norm),
         )
 
     def create_user(self, nombre: str, activo: bool = True) -> int:
@@ -251,10 +308,13 @@ class Database:
                     WHERE mm.id = 1
                 ) AS model_trained_at
             FROM usuarios u
-            LEFT JOIN muestras m ON m.usuario_id = u.id
+            LEFT JOIN muestras m
+                ON m.usuario_id = u.id
+               AND m.preprocess_mode = ?
             GROUP BY u.id
             ORDER BY u.id DESC
-            """
+            """,
+            (config.sface_preprocess_mode,),
         )
 
         users: list[dict[str, Any]] = []
@@ -287,10 +347,11 @@ class Database:
             SELECT imagen_ref
             FROM muestras
             WHERE usuario_id=?
+              AND preprocess_mode=?
             ORDER BY id DESC
             LIMIT 1
             """,
-            (int(user_id),),
+            (int(user_id), config.sface_preprocess_mode),
         )
         return str(row["imagen_ref"]) if row else None
 
@@ -309,7 +370,20 @@ class Database:
 
         return ref
 
-    def insert_sample_with_pose(self, user_id: int, imagen_ref: str, pose_type: str) -> int:
+    def _normalize_preprocess_mode(self, preprocess_mode: Optional[str]) -> str:
+        mode = (preprocess_mode or config.sface_preprocess_mode).strip().lower()
+        valid_modes = {config.legacy_preprocess_mode, config.sface_preprocess_mode}
+        if mode not in valid_modes:
+            raise ValueError("preprocess_mode inválido")
+        return mode
+
+    def insert_sample_with_pose(
+        self,
+        user_id: int,
+        imagen_ref: str,
+        pose_type: str,
+        preprocess_mode: Optional[str] = None,
+    ) -> int:
         if int(user_id) <= 0:
             raise ValueError("user_id inválido")
         imagen_ref_norm = self._normalize_imagen_ref(imagen_ref)
@@ -317,47 +391,114 @@ class Database:
         pose = pose_type.strip().lower() if pose_type else "frontal"
         if pose not in valid_poses:
             pose = "frontal"
+        mode = self._normalize_preprocess_mode(preprocess_mode)
         return self.execute(
-            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type) VALUES (?, ?, ?)",
-            (int(user_id), imagen_ref_norm, pose),
+            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type, preprocess_mode) VALUES (?, ?, ?, ?)",
+            (int(user_id), imagen_ref_norm, pose, mode),
         )
 
-    def insert_samples_with_pose(self, user_id: int, samples: Iterable[tuple[str, str]]) -> int:
+    def insert_samples_with_pose(
+        self,
+        user_id: int,
+        samples: Iterable[tuple[str, str]],
+        preprocess_mode: Optional[str] = None,
+    ) -> int:
         if int(user_id) <= 0:
             raise ValueError("user_id inválido")
         valid_poses = {"frontal", "tilt_left", "tilt_right", "look_up", "look_down", "turn_left", "turn_right", "center"}
+        mode = self._normalize_preprocess_mode(preprocess_mode)
         rows = []
         for imagen_ref, pose_type in samples:
             imagen_ref_norm = self._normalize_imagen_ref(imagen_ref)
             pose = pose_type.strip().lower() if pose_type else "frontal"
             if pose not in valid_poses:
                 pose = "frontal"
-            rows.append((int(user_id), imagen_ref_norm, pose))
+            rows.append((int(user_id), imagen_ref_norm, pose, mode))
         return self.execute_many(
-            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type) VALUES (?, ?, ?)",
+            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type, preprocess_mode) VALUES (?, ?, ?, ?)",
             rows,
         )
 
-    def insert_sample(self, user_id: int, imagen_ref: str) -> int:
+    def insert_sample(
+        self,
+        user_id: int,
+        imagen_ref: str,
+        preprocess_mode: Optional[str] = None,
+    ) -> int:
         if int(user_id) <= 0:
             raise ValueError("user_id inválido")
         imagen_ref_norm = self._normalize_imagen_ref(imagen_ref)
+        mode = self._normalize_preprocess_mode(preprocess_mode)
         return self.execute(
-            "INSERT INTO muestras (usuario_id, imagen_ref) VALUES (?, ?)",
-            (int(user_id), imagen_ref_norm),
+            "INSERT INTO muestras (usuario_id, imagen_ref, preprocess_mode) VALUES (?, ?, ?)",
+            (int(user_id), imagen_ref_norm, mode),
         )
 
-    def list_samples(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
-        if user_id is None:
-            rows = self.fetch_all("SELECT id, usuario_id, imagen_ref, fecha_captura FROM muestras ORDER BY id DESC")
-        else:
+    def list_samples(
+        self,
+        user_id: Optional[int] = None,
+        preprocess_mode: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        filters = []
+        params: list[Any] = []
+        if user_id is not None:
             if int(user_id) <= 0:
                 raise ValueError("user_id inválido")
-            rows = self.fetch_all(
-                "SELECT id, usuario_id, imagen_ref, fecha_captura FROM muestras WHERE usuario_id=? ORDER BY id DESC",
-                (int(user_id),),
-            )
+            filters.append("usuario_id=?")
+            params.append(int(user_id))
+        if preprocess_mode is not None:
+            filters.append("preprocess_mode=?")
+            params.append(self._normalize_preprocess_mode(preprocess_mode))
+        where = f" WHERE {' AND '.join(filters)}" if filters else ""
+        query = (
+            "SELECT id, usuario_id, imagen_ref, pose_type, preprocess_mode, fecha_captura "
+            f"FROM muestras{where} ORDER BY id DESC"
+        )
+        rows = self.fetch_all(query, tuple(params))
         return [dict(row) for row in rows]
+
+    def purge_face_samples(self, dataset_dir: str = config.dataset_dir, model_path: str = config.model_path) -> dict[str, Any]:
+        rows = self.fetch_all("SELECT imagen_ref FROM muestras")
+        deleted_files = 0
+        root = Path(dataset_dir).resolve()
+        for row in rows:
+            ref = str(row["imagen_ref"])
+            path = Path(ref)
+            if not path.is_absolute():
+                path = root.parent / path
+            try:
+                resolved = path.resolve()
+                if root in resolved.parents and resolved.is_file():
+                    resolved.unlink()
+                    deleted_files += 1
+            except OSError:
+                logger.warning("purge_face_sample_file_failed path=%s", ref)
+
+        deleted_samples = 0
+        try:
+            with self.connect() as conn:
+                cur = conn.execute("DELETE FROM muestras")
+                deleted_samples = int(cur.rowcount if cur.rowcount is not None else 0)
+                conn.execute("DELETE FROM model_meta WHERE id=1")
+        except Exception:
+            logger.exception("db_purge_face_samples_failed")
+            raise
+
+        model_removed = False
+        try:
+            path = Path(model_path)
+            if path.exists() and path.is_file():
+                path.unlink()
+                model_removed = True
+        except OSError:
+            logger.warning("purge_model_file_failed path=%s", model_path)
+
+        return {
+            "ok": True,
+            "deleted_files": deleted_files,
+            "deleted_samples": deleted_samples,
+            "model_removed": model_removed,
+        }
 
     def insert_access(
         self,
@@ -411,8 +552,8 @@ class Database:
         if int(user_id) <= 0:
             raise ValueError("user_id inválido")
         row = self.fetch_one(
-            "SELECT COUNT(*) AS total FROM muestras WHERE usuario_id=?",
-            (int(user_id),),
+            "SELECT COUNT(*) AS total FROM muestras WHERE usuario_id=? AND preprocess_mode=?",
+            (int(user_id), config.sface_preprocess_mode),
         )
         return row["total"] if row else 0
 

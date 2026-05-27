@@ -34,7 +34,19 @@ const faceArrowUp = document.getElementById('faceArrowUp');
 const faceArrowDown = document.getElementById('faceArrowDown');
 const cameraBadge = document.getElementById('cameraBadge');
 const cameraBadgeText = document.getElementById('cameraBadgeText');
+const primaryFaceBox = document.getElementById('primaryFaceBox');
+const welcomeOverlay = document.getElementById('welcomeOverlay');
+const welcomeCheckIcon = document.getElementById('welcomeCheckIcon');
+const welcomeTitle = document.getElementById('welcomeTitle');
+const welcomeName = document.getElementById('welcomeName');
+const supportHelpButton = document.getElementById('supportHelpButton');
+const supportHelpDialog = document.getElementById('supportHelpDialog');
+const supportHelpMessage = document.getElementById('supportHelpMessage');
+const supportHelpPhone = document.getElementById('supportHelpPhone');
+const supportHelpClose = document.getElementById('supportHelpClose');
 const infoPanel = document.getElementById('infoPanel');
+const accessReceiptIcon = document.getElementById('accessReceiptIcon');
+const accessReceiptMeta = document.getElementById('accessReceiptMeta');
 const infoTitle = document.getElementById('infoTitle');
 const infoDesc = document.getElementById('infoDesc');
 const cameraTitle = document.getElementById('cameraTitle');
@@ -46,8 +58,11 @@ const desktopLaunchPending = isDesktopLaunchPending(window);
 let desktopReadyReleased = !desktopLaunchPending;
 
 const AUTO_TRIGGER_COOLDOWN_MS = 4000;
+const SUPPORT_HELP_DELAY_MS = 10000;
 let lastAutoTriggerMs = 0;
 let toastTimer = null;
+let supportHelpTimer = null;
+let activeSupportPhone = '';
 const AUTH_PROGRESS_STATE_CLASSES = ['is-idle', 'is-processing', 'is-success', 'is-error'];
 
 /* i18n helper — devuelve el texto traducido al idioma actual.
@@ -64,6 +79,7 @@ const toastMap = {
   granted: { text: 'Acceso concedido', sub: 'Validación biométrica exitosa', cls: 'success', timeout: 2600 },
   denied: { text: 'Acceso denegado', sub: 'Identidad no válida para ingreso', cls: 'error', timeout: 2300 },
   blocked: { text: 'Acceso restringido', sub: 'Límite de intentos excedido', cls: 'warning', timeout: 3200 },
+  multipleFaces: { text: 'Debe salir la otra persona', sub: 'Solo una persona frente a la cámara', cls: 'warning', timeout: 2600 },
   processing: { text: 'Procesando', sub: 'Analizando biometría facial', cls: 'processing', timeout: 1400 },
   initializing: { text: 'Sistema inicializando', sub: 'Cargando cámara y modelo', cls: 'processing', timeout: 2000 },
   noface: { text: 'Sin rostro detectado', sub: 'Esperando frente a cámara', cls: 'warning', timeout: 1600 },
@@ -80,6 +96,7 @@ const analysisEventToToast = {
   camera_error: 'cameraError',
   model_not_loaded: 'initializing',
   busy: 'busy',
+  multiple_faces: 'multipleFaces',
 };
 
 let faceAction = null;
@@ -182,31 +199,129 @@ function getRecognizedUserName(rawName) {
   return value;
 }
 
-function formatRecognizedUserName(userName) {
-  const normalized = userName
-    .toUpperCase()
-    .replace(/\s+/g, ' ')
-    .trim();
-  const parts = normalized.split(' ');
-
-  if (parts.length < 2) {
-    return normalized;
-  }
-
-  return `${parts[0]}\n${parts.slice(1).join(' ')}`;
+function setElementHidden(element, hidden) {
+  element?.classList.toggle('is-hidden', Boolean(hidden));
 }
 
-function renderGrantedUserName(stateKey, data) {
-  if (!infoTitle || stateKey !== 'granted') {
+function resetSupportHelp({ closeDialog = true } = {}) {
+  if (supportHelpTimer) {
+    clearTimeout(supportHelpTimer);
+    supportHelpTimer = null;
+  }
+  setElementHidden(supportHelpButton, true);
+  if (closeDialog) {
+    setElementHidden(supportHelpDialog, true);
+    supportHelpDialog?.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function updateSupportHelp(data) {
+  activeSupportPhone = String(data?.support_phone || '').trim();
+  const hasPhone = activeSupportPhone.length > 0;
+  const noFace = !data?.face_detected && Number(data?.faces_count || 0) === 0;
+  const result = String(data?.last_result || '');
+  const recent = Math.max(0, Math.floor(Date.now() / 1000) - Number(data?.timestamp || 0)) <= 6;
+  const accessIssue = recent && (
+    result === 'MULTIPLE_FACES' ||
+    result === 'DENEGADO_BLOQUEO' ||
+    result.startsWith('DENEGADO')
+  );
+
+  if (!hasPhone || (!noFace && !accessIssue)) {
+    resetSupportHelp({ closeDialog: !hasPhone || (!noFace && !accessIssue) });
     return;
   }
 
+  if (supportHelpMessage) {
+    supportHelpMessage.textContent = tr('En caso de no poder acceder debido a problemas de reconocimiento, llama al departamento encargado.');
+  }
+
+  if (supportHelpPhone) {
+    supportHelpPhone.textContent = activeSupportPhone;
+  }
+
+  if (accessIssue) {
+    if (supportHelpTimer) {
+      clearTimeout(supportHelpTimer);
+      supportHelpTimer = null;
+    }
+    setElementHidden(supportHelpButton, false);
+    return;
+  }
+
+  if (!supportHelpTimer && supportHelpButton?.classList.contains('is-hidden')) {
+    supportHelpTimer = setTimeout(() => {
+      supportHelpTimer = null;
+      if (activeSupportPhone) {
+        setElementHidden(supportHelpButton, false);
+      }
+    }, SUPPORT_HELP_DELAY_MS);
+  }
+}
+
+function openSupportHelp() {
+  if (!activeSupportPhone || !supportHelpDialog) return;
+  if (supportHelpMessage) {
+    supportHelpMessage.textContent = tr('En caso de no poder acceder debido a problemas de reconocimiento, llama al departamento encargado.');
+  }
+  if (supportHelpPhone) supportHelpPhone.textContent = activeSupportPhone;
+  supportHelpDialog.classList.remove('is-hidden');
+  supportHelpDialog.setAttribute('aria-hidden', 'false');
+}
+
+function closeSupportHelp() {
+  supportHelpDialog?.classList.add('is-hidden');
+  supportHelpDialog?.setAttribute('aria-hidden', 'true');
+}
+
+function updatePrimaryFaceBox(data, uiStateKey) {
+  if (!primaryFaceBox) return;
+  const bbox = data?.primary_face_bbox || data?.face_bbox;
+  const reportedFacesCount = Number(data?.faces_count || 0);
+  const facesCount = reportedFacesCount > 0 ? reportedFacesCount : (data?.face_detected ? 1 : 0);
+  const visible = Boolean(data?.face_detected && bbox && facesCount > 0);
+
+  if (!visible) {
+    primaryFaceBox.classList.add('is-hidden');
+    primaryFaceBox.removeAttribute('style');
+    return;
+  }
+
+  primaryFaceBox.style.left = `${Math.round(Number(bbox.x || 0) * 10000) / 100}%`;
+  primaryFaceBox.style.top = `${Math.round(Number(bbox.y || 0) * 10000) / 100}%`;
+  primaryFaceBox.style.width = `${Math.round(Number(bbox.w || 0) * 10000) / 100}%`;
+  primaryFaceBox.style.height = `${Math.round(Number(bbox.h || 0) * 10000) / 100}%`;
+  primaryFaceBox.classList.remove('is-hidden', 'is-granted', 'is-warning', 'is-denied');
+  if (facesCount > 1) {
+    primaryFaceBox.classList.add('is-warning');
+  } else if (uiStateKey === 'granted') {
+    primaryFaceBox.classList.add('is-granted');
+  } else if (['denied', 'blocked', 'unrecognized'].includes(uiStateKey)) {
+    primaryFaceBox.classList.add('is-denied');
+  }
+}
+
+function updateWelcomeOverlay(stateKey, data) {
+  if (!welcomeOverlay || !welcomeTitle || !welcomeName) return;
   const userName = getRecognizedUserName(data?.last_user);
-  if (!userName) {
+  if (stateKey !== 'granted' || !userName) {
+    welcomeOverlay.classList.add('is-hidden');
+    welcomeCheckIcon?.classList.add('is-hidden');
     return;
   }
+  welcomeTitle.textContent = 'Adelante';
+  welcomeName.textContent = userName;
+  welcomeCheckIcon?.classList.remove('is-hidden');
+  welcomeOverlay.classList.remove('is-hidden');
+  welcomeOverlay.classList.add('welcome-overlay--blue');
+}
 
-  infoTitle.textContent = formatRecognizedUserName(userName);
+function formatAccessReceiptTime() {
+  return new Date().toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 
 function updateFaceIndicator(stateKey) {
@@ -238,6 +353,7 @@ function updateFaceIndicator(stateKey) {
       granted:      { text: 'Acceso concedido',    cls: 'is-granted'  },
       denied:       { text: 'Acceso denegado',     cls: 'is-denied'   },
       blocked:      { text: 'Acceso restringido',  cls: 'is-blocked'  },
+      multipleFaces:{ text: 'Debe salir la otra persona', cls: 'is-blocked' },
       unrecognized: { text: 'No reconocido',       cls: 'is-denied'   },
       processing:   { text: 'Rostro detectado',    cls: 'is-tracking' },
       noface:       { text: 'Esperando detección', cls: 'is-idle'     },
@@ -252,10 +368,11 @@ function updateFaceIndicator(stateKey) {
 
   if (infoTitle) {
     const titleMap = {
-      granted:      'Acceso<br>concedido',
+      granted:      'Acceso concedido',
       denied:       'Acceso<br>denegado',
-      blocked:      'Acceso<br>restringido',
-      unrecognized: 'No<br>reconocido',
+      blocked:      'Acceso denegado',
+      multipleFaces:'Debe salir<br>la otra persona',
+      unrecognized: 'No reconocido',
       processing:   'Validando<br>identidad',
       noface:       'Esperando<br>detección',
       cameraError:  'Error de<br>cámara',
@@ -267,9 +384,10 @@ function updateFaceIndicator(stateKey) {
 
   if (infoDesc) {
     const descMap = {
-      granted:      'Identidad verificada<br><strong>acceso autorizado</strong>',
+      granted:      'Puerta desbloqueada<br><strong>Ingreso autorizado</strong>',
       denied:       'Identidad no autorizada<br><strong>acceso denegado</strong>',
-      blocked:      'Demasiados intentos<br><strong>acceso restringido</strong>',
+      blocked:      'No se pudo validar la identidad<br><strong>intenta nuevamente</strong>',
+      multipleFaces:'La cámara detecta más de una persona<br><strong>esperando despeje</strong>',
       unrecognized: 'Rostro no registrado<br><strong>en el sistema</strong>',
       processing:   'Espera un momento mientras<br><strong>verificamos tu acceso</strong>',
       noface:       'Coloca tu rostro frente<br><strong>a la cámara</strong>',
@@ -280,11 +398,24 @@ function updateFaceIndicator(stateKey) {
     infoDesc.innerHTML = tr(descMap[stateKey] || descMap.processing);
   }
 
+  if (accessReceiptIcon) {
+    accessReceiptIcon.classList.toggle('is-hidden', stateKey !== 'granted');
+  }
+
+  if (accessReceiptMeta) {
+    if (stateKey === 'granted') {
+      accessReceiptMeta.textContent = `${tr('Registro de acceso')} · ${formatAccessReceiptTime()}`;
+    } else {
+      accessReceiptMeta.textContent = '';
+    }
+  }
+
   if (cameraTitle) {
     const ctMap = {
       granted:      'Acceso concedido',
       denied:       'Acceso denegado',
       blocked:      'Acceso restringido',
+      multipleFaces:'Debe salir la otra persona',
       unrecognized: 'No reconocido',
       processing:   'Validando identidad',
       noface:       'Esperando detección',
@@ -366,7 +497,7 @@ function updateFaceGuidance(guidance, uiStateKey) {
     setFaceGuideState('is-idle');
     hideAllFaceArrows();
     if (guidanceMessage) {
-      guidanceMessage.textContent = tr('Coloca tu rostro dentro de la guía');
+      guidanceMessage.textContent = tr('Buscando rostro');
     }
     return;
   }
@@ -489,8 +620,8 @@ function classifyState(data) {
     return { key: 'granted', badge: ['Acceso concedido', 'state-success'] };
   }
 
-  if (statusAge <= 3 && result === 'DENEGADO_BLOQUEO') {
-    return { key: 'blocked', badge: ['Acceso restringido', 'state-warning'] };
+  if (result === 'MULTIPLE_FACES' || Number(data.faces_count || 0) > 1) {
+    return { key: 'multipleFaces', badge: ['Debe salir la otra persona', 'state-warning'] };
   }
 
   if (statusAge <= 3 && result.startsWith('DENEGADO')) {
@@ -538,7 +669,9 @@ async function loadStatus() {
     setSystemBadge(uiState.badge[0], uiState.badge[1]);
 
     updateFaceIndicator(uiState.key);
-    renderGrantedUserName(uiState.key, data);
+    updateWelcomeOverlay(uiState.key, data);
+    updatePrimaryFaceBox(data, uiState.key);
+    updateSupportHelp(data);
     updateFaceGuidance(data.face_guidance, uiState.key);
     showUserOverlay(data);
     faceAction?.updateStatus(data);
@@ -553,7 +686,7 @@ async function loadStatus() {
     }
 
     const lockSnapshot = lockscreenController?.getSnapshot?.();
-    if (lockSnapshot?.state === LOCK_STATES.WAKING) {
+    if (lockscreenController && LOCK_STATES.WAKING && lockSnapshot?.state === LOCK_STATES.WAKING) {
       const wakeReady = isWakeReadyStatus(data, { isPollingPaused, isScanPaused });
       if (wakeReady) {
         lockscreenController.dispatch({
@@ -574,7 +707,7 @@ async function loadStatus() {
     }
 
     const lockSnapshot = lockscreenController?.getSnapshot?.();
-    if (lockSnapshot?.state === LOCK_STATES.WAKING) {
+    if (lockscreenController && LOCK_STATES.WAKING && lockSnapshot?.state === LOCK_STATES.WAKING) {
       lockscreenController.dispatch({
         type: LOCK_EVENTS.RESUME_FAIL,
         wakeAttemptId: lockSnapshot.wakeAttemptId,
@@ -789,6 +922,9 @@ document.addEventListener('keydown', (event) => {
   }
   dispatchUserActivity();
 });
+
+supportHelpButton?.addEventListener('click', openSupportHelp);
+supportHelpClose?.addEventListener('click', closeSupportHelp);
 
 lockscreenApi?.bindTap(() => {
   lockscreenController?.dispatch({ type: LOCK_EVENTS.USER_TAP_OR_CLICK });

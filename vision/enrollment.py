@@ -8,7 +8,7 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import cv2
 import numpy as np
@@ -47,10 +47,12 @@ class EnrollmentSession:
         user_id: int,
         pose: PoseHeuristic,
         user_name: Optional[str] = None,
+        face_aligner: Optional[Callable[[np.ndarray, Any], Optional[np.ndarray]]] = None,
     ) -> None:
         self.user_id = user_id
         self.user_name = user_name or f"Usuario {user_id}"
         self.pose = pose
+        self.face_aligner = face_aligner
 
         self.samples_per_step: int = config.enrollment_samples_per_step
         self.hold_steady_ms: int = config.enrollment_hold_steady_ms
@@ -66,6 +68,7 @@ class EnrollmentSession:
         self._message: str = ENROLLMENT_STEPS[0]["label"]
         self._faces_count: int = 0
         self._glasses_detected: bool = False
+        self._face_bbox: Optional[dict[str, float]] = None
         self._last_glasses_check_ms: float = 0
         self._started_at_ms: int = int(now)
         self._updated_at_ms: int = int(now)
@@ -175,7 +178,7 @@ class EnrollmentSession:
         self,
         frame: np.ndarray,
         gray: np.ndarray,
-        face: Optional[tuple[int, int, int, int]],
+        face: Optional[Any],
         faces_count: int,
     ) -> None:
         with self._lock:
@@ -185,7 +188,7 @@ class EnrollmentSession:
         self,
         frame: np.ndarray,
         gray: np.ndarray,
-        face: Optional[tuple[int, int, int, int]],
+        face: Optional[Any],
         faces_count: int,
     ) -> None:
         now = self._now()
@@ -195,15 +198,18 @@ class EnrollmentSession:
             return
 
         if face is None or faces_count == 0:
+            self._face_bbox = None
             elapsed = now - self._last_face_ms
             if elapsed >= self.face_lost_timeout_ms:
                 self._state = "face_lost"
-                self._message = "Centra tu rostro en la guia"
+                self._message = "Rostro no visible"
                 self._hold_start_ms = None
                 self._touch(now)
             return
 
         self._last_face_ms = now
+        bbox = self._bbox_tuple(face)
+        self._face_bbox = self._normalize_bbox(bbox, gray.shape)
 
         if self._state == "face_lost":
             self._state = "step_active"
@@ -212,7 +218,7 @@ class EnrollmentSession:
 
         if faces_count > 1:
             self._state = "step_active"
-            self._message = "Solo debe haber una persona"
+            self._message = "Debe salir la otra persona"
             self._hold_start_ms = None
             self._touch(now)
             return
@@ -220,11 +226,11 @@ class EnrollmentSession:
         # Glasses detection (throttled — only check every ~1s to avoid perf hit)
         # Only sets the flag for a frontend warning; does NOT block capture.
         if now - self._last_glasses_check_ms > 1000:
-            self._glasses_detected = self._detect_glasses(gray, face)
+            self._glasses_detected = self._detect_glasses(gray, bbox)
             self._last_glasses_check_ms = now
 
         frame_shape = gray.shape
-        hints = self.pose.analyze(gray, face, frame_shape)
+        hints = self.pose.analyze(gray, bbox, frame_shape)
 
         if hints.brightness < self.brightness_threshold:
             self._state = "low_light"
@@ -239,7 +245,7 @@ class EnrollmentSession:
 
         step_name = self._step["name"]
         if step_name == "center" and not self.pose.has_baseline:
-            self.pose.set_baseline(face, frame_shape)
+            self.pose.set_baseline(bbox, frame_shape)
 
         matched, guidance_msg = self.pose.check_step(step_name, hints)
         if not matched:
@@ -262,7 +268,7 @@ class EnrollmentSession:
 
         self._state = "capturing"
         self._touch(now)
-        path = self._capture(gray, face)
+        path = self._capture(frame, face)
         self._hold_start_ms = None
 
         if not path:
@@ -290,23 +296,44 @@ class EnrollmentSession:
 
     def _capture(
         self,
-        gray: np.ndarray,
-        face: tuple[int, int, int, int],
+        frame: np.ndarray,
+        face: Any,
     ) -> Optional[str]:
-        x, y, w, h = [int(v) for v in face]
-        x = max(0, x)
-        y = max(0, y)
-        roi = gray[y : y + h, x : x + w]
-        if roi.size == 0:
+        if not callable(self.face_aligner):
             return None
-
-        roi_resized = cv2.resize(roi, (200, 200))
+        roi = self.face_aligner(frame, face)
+        if roi is None or roi.size == 0:
+            return None
+        if roi.ndim == 2:
+            roi = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
+        roi_resized = cv2.resize(roi, (112, 112))
         step_name = self._step["name"]
         idx = len(self._step_samples) + 1
         filename = f"enroll_{step_name}_{idx:03d}.jpg"
         full_path = self._user_dir / filename
         _storage.write_image(full_path, roi_resized)
         return f"{config.dataset_dir}/user_{self.user_id}/{filename}"
+
+    @staticmethod
+    def _bbox_tuple(face: Any) -> tuple[int, int, int, int]:
+        if hasattr(face, "bbox"):
+            return tuple(int(v) for v in face.bbox)
+        return tuple(int(v) for v in face[:4])
+
+    @staticmethod
+    def _normalize_bbox(face: tuple[int, int, int, int], frame_shape: tuple[int, ...]) -> dict[str, float]:
+        x, y, w, h = [int(v) for v in face]
+        frame_h, frame_w = frame_shape[:2]
+        x = max(0, min(x, frame_w - 1))
+        y = max(0, min(y, frame_h - 1))
+        w = max(1, min(w, frame_w - x))
+        h = max(1, min(h, frame_h - y))
+        return {
+            "x": round(x / max(1, frame_w), 6),
+            "y": round(y / max(1, frame_h), 6),
+            "w": round(w / max(1, frame_w), 6),
+            "h": round(h / max(1, frame_h), 6),
+        }
 
     def _advance_step(self, now: Optional[float] = None) -> None:
         self._state = "step_complete"
@@ -456,6 +483,7 @@ class EnrollmentSession:
                 "brightness_ok": self._state != "low_light",
                 "multiple_faces": self._faces_count > 1,
                 "glasses_detected": self._glasses_detected,
+                "face_bbox": self._face_bbox,
             },
             "actions": {
                 "can_retry": can_retry,

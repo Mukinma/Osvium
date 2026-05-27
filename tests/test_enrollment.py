@@ -78,7 +78,7 @@ def test_session_reports_multiple_faces_and_recovers_from_light_and_face_loss(tm
     session.update(frame, gray, (10, 10, 40, 40), 2)
     status = session.get_status()
     assert status["guidance"]["multiple_faces"] is True
-    assert status["guidance"]["hint"] == "Solo debe haber una persona"
+    assert status["guidance"]["hint"] == "Debe salir la otra persona"
 
     pose.brightness = 10.0
     session.update(frame, gray, (10, 10, 40, 40), 1)

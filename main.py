@@ -23,11 +23,11 @@ from database.db import db
 from hardware.gpio_control import RelayController
 from rate_limit import limiter
 from vision.camera import CameraStream
-from vision.detector import HaarFaceDetector
+from vision.detector import FaceDetection, YuNetFaceDetector
 from vision.enrollment import ENROLLMENT_STEPS, EnrollmentSession
 from vision.face_guidance import FaceGuidanceEngine
 from vision.pose_heuristic import PoseHeuristic
-from vision.recognizer import LBPHRecognizer
+from vision.recognizer import SFaceRecognizer
 from vision.secure_storage import storage as _storage
 from vision.trainer import FaceTrainer
 
@@ -38,8 +38,8 @@ logger = logging.getLogger("camerapi.main")
 class AccessService:
     def __init__(self):
         self.camera = CameraStream()
-        self.detector = HaarFaceDetector()
-        self.recognizer = LBPHRecognizer()
+        self.detector = YuNetFaceDetector()
+        self.recognizer = SFaceRecognizer()
         self.trainer = FaceTrainer(self.recognizer)
         self.relay = RelayController(pin=18, active_high=True)
         self.guidance = FaceGuidanceEngine()
@@ -78,6 +78,10 @@ class AccessService:
             "sleep_mode": False,
             "face_detected": False,
             "face_bbox": None,
+            "faces_count": 0,
+            "primary_face_bbox": None,
+            "recognition_score": None,
+            "recognition_metric": self.recognizer.recognition_metric,
             "face_updated_ts": 0,
             "camera_frame_width": config.frame_width,
             "camera_frame_height": config.frame_height,
@@ -97,10 +101,9 @@ class AccessService:
         self.last_perf_log_ts = 0.0
 
         self.detector_params = {
-            "scaleFactor": config.detect_scale_factor,
-            "minNeighbors": config.detect_min_neighbors,
-            "minSize": [config.detect_min_size_w, config.detect_min_size_h],
-            "downscale": config.detect_downscale,
+            "scoreThreshold": config.yunet_score_threshold,
+            "nmsThreshold": config.yunet_nms_threshold,
+            "topK": config.yunet_top_k,
         }
 
     def start(self):
@@ -190,6 +193,8 @@ class AccessService:
                     self.system_status["fps"] = 0
                     self.system_status["face_detected"] = False
                     self.system_status["face_bbox"] = None
+                    self.system_status["faces_count"] = 0
+                    self.system_status["primary_face_bbox"] = None
                     self.system_status["analysis_state"] = "sleep"
                 continue
             camera_fps = self.camera.get_capture_fps()
@@ -202,6 +207,8 @@ class AccessService:
                 with self.lock:
                     self.system_status["face_detected"] = False
                     self.system_status["face_bbox"] = None
+                    self.system_status["faces_count"] = 0
+                    self.system_status["primary_face_bbox"] = None
                 continue
 
             self.last_frame_counter += 1
@@ -240,30 +247,43 @@ class AccessService:
     def _to_gray(frame):
         return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    def _detect_faces(self, gray_frame):
+    def _detect_faces(self, frame):
         """Detecta rostros y retorna (rostro principal, total de rostros)."""
-        faces = self.detector.detect(gray_frame, self.detector_params)
+        faces = self.detector.detect(frame, self.detector_params)
         count = len(faces)
         if count == 0:
             return None, 0
-        primary = max(faces, key=lambda f: f[2] * f[3])
+        primary = max(faces, key=self._face_area)
         return primary, count
 
     @staticmethod
-    def _normalize_roi(gray_frame, face):
-        x, y, w, h = [int(v) for v in face]
+    def _face_bbox_tuple(face) -> tuple[int, int, int, int]:
+        if isinstance(face, FaceDetection):
+            return face.bbox
+        return tuple(int(v) for v in face[:4])
+
+    @staticmethod
+    def _face_area(face) -> int:
+        if isinstance(face, FaceDetection):
+            return face.area
+        x, y, w, h = [int(v) for v in face[:4]]
+        return max(1, w) * max(1, h)
+
+    @staticmethod
+    def _normalize_roi(frame, face, size: tuple[int, int] = (112, 112)):
+        x, y, w, h = AccessService._face_bbox_tuple(face)
         x = max(0, x)
         y = max(0, y)
         w = max(1, w)
         h = max(1, h)
-        roi = gray_frame[y : y + h, x : x + w]
+        roi = frame[y : y + h, x : x + w]
         if roi.size == 0:
             return None
-        return cv2.resize(roi, (200, 200))
+        return cv2.resize(roi, size)
 
     @staticmethod
     def _normalize_face_bbox(face, frame_width: int, frame_height: int) -> dict[str, float]:
-        x, y, w, h = [int(v) for v in face]
+        x, y, w, h = AccessService._face_bbox_tuple(face)
         x = max(0, min(x, frame_width - 1))
         y = max(0, min(y, frame_height - 1))
         w = max(1, min(w, frame_width - x))
@@ -278,7 +298,7 @@ class AccessService:
     def _run_detection_pipeline(self, frame) -> None:
         gray = self._to_gray(frame)
         frame_height, frame_width = gray.shape[:2]
-        face, faces_count = self._detect_faces(gray)
+        face, faces_count = self._detect_faces(frame)
         now_ts = int(time.time())
         bbox = None
         detected = False
@@ -309,6 +329,8 @@ class AccessService:
         with self.lock:
             self.system_status["face_detected"] = detected
             self.system_status["face_bbox"] = bbox
+            self.system_status["faces_count"] = faces_count
+            self.system_status["primary_face_bbox"] = bbox
             self.system_status["face_updated_ts"] = now_ts
             self.system_status["camera_frame_width"] = frame_width
             self.system_status["camera_frame_height"] = frame_height
@@ -317,18 +339,17 @@ class AccessService:
     def _apply_access_decision(
         self,
         label: Optional[int],
-        confidence: Optional[float],
+        score: Optional[float],
         conf: dict[str, Any],
     ) -> tuple[Optional[int], str, str]:
         threshold = float(conf["umbral_confianza"])
         open_sec = int(conf["tiempo_apertura_seg"])
-        max_attempts = int(conf["max_intentos"])
 
         user_id = None
         user_name = "Desconocido"
         result = "DENEGADO"
 
-        if label is not None and confidence is not None and confidence <= threshold:
+        if label is not None and score is not None and score >= threshold:
             user = db.get_user(label)
             if user and int(user["activo"]) == 1:
                 user_id = int(user["id"])
@@ -341,17 +362,12 @@ class AccessService:
         else:
             self.consecutive_denied += 1
 
-        if self.consecutive_denied >= max_attempts:
-            result = "DENEGADO_BLOQUEO"
-
         return user_id, user_name, result
 
     @staticmethod
     def _event_from_result(result: str) -> str:
         if result.startswith("AUTORIZADO"):
             return "authorized"
-        if result == "DENEGADO_BLOQUEO":
-            return "blocked"
         return "denied"
 
     def _build_analysis_payload(
@@ -369,6 +385,10 @@ class AccessService:
         with self.lock:
             face_detected = bool(self.system_status.get("face_detected", False))
             face_bbox = self.system_status.get("face_bbox")
+            faces_count = int(self.system_status.get("faces_count", 0) or 0)
+            primary_face_bbox = self.system_status.get("primary_face_bbox")
+            recognition_score = self.system_status.get("recognition_score")
+            recognition_metric = self.system_status.get("recognition_metric")
             analysis_state = str(self.system_status.get("analysis_state", "idle"))
         return {
             "ok": ok,
@@ -382,6 +402,10 @@ class AccessService:
             "analysis_state": analysis_state,
             "face_detected": face_detected,
             "face_bbox": face_bbox,
+            "faces_count": faces_count,
+            "primary_face_bbox": primary_face_bbox,
+            "recognition_score": recognition_score,
+            "recognition_metric": recognition_metric,
         }
 
     def analyze_once(self) -> tuple[dict[str, Any], int]:
@@ -441,8 +465,7 @@ class AccessService:
                 )
                 return payload, 503
 
-            gray = self._to_gray(frame)
-            frame_height, frame_width = gray.shape[:2]
+            frame_height, frame_width = frame.shape[:2]
             with self.lock:
                 self.system_status["camera_frame_width"] = frame_width
                 self.system_status["camera_frame_height"] = frame_height
@@ -485,32 +508,15 @@ class AccessService:
                     logger.error("recognition_cycle_end attempt_id=%s result=model_not_loaded", attempt_id)
                     return payload, 503
 
-            face, _ = self._detect_faces(gray)
+            face, faces_count = self._detect_faces(frame)
             if face is None:
                 ts = int(time.time())
                 with self.lock:
                     self.system_status["face_detected"] = False
                     self.system_status["face_bbox"] = None
-                    self.system_status["face_updated_ts"] = ts
-                    self.system_status["analysis_state"] = "error"
-                payload = self._build_analysis_payload(
-                    ok=False,
-                    event="no_face",
-                    result="NO_FACE",
-                    user_id=None,
-                    user_name=None,
-                    confidence=None,
-                    timestamp=ts,
-                )
-                logger.info("recognition_cycle_end attempt_id=%s result=no_face", attempt_id)
-                return payload, 200
-
-            roi = self._normalize_roi(gray, face)
-            if roi is None:
-                ts = int(time.time())
-                with self.lock:
-                    self.system_status["face_detected"] = False
-                    self.system_status["face_bbox"] = None
+                    self.system_status["faces_count"] = 0
+                    self.system_status["primary_face_bbox"] = None
+                    self.system_status["recognition_score"] = None
                     self.system_status["face_updated_ts"] = ts
                     self.system_status["analysis_state"] = "error"
                 payload = self._build_analysis_payload(
@@ -529,18 +535,60 @@ class AccessService:
             with self.lock:
                 self.system_status["face_detected"] = True
                 self.system_status["face_bbox"] = face_bbox
+                self.system_status["faces_count"] = faces_count
+                self.system_status["primary_face_bbox"] = face_bbox
                 self.system_status["face_updated_ts"] = int(time.time())
+
+            if faces_count > 1:
+                ts = int(time.time())
+                with self.lock:
+                    self.system_status["last_user"] = "-"
+                    self.system_status["last_result"] = "MULTIPLE_FACES"
+                    self.system_status["recognition_score"] = None
+                    self.system_status["timestamp"] = ts
+                    self.system_status["analysis_state"] = "error"
+                payload = self._build_analysis_payload(
+                    ok=False,
+                    event="multiple_faces",
+                    result="MULTIPLE_FACES",
+                    user_id=None,
+                    user_name=None,
+                    confidence=None,
+                    timestamp=ts,
+                )
+                logger.warning("recognition_cycle_end attempt_id=%s result=multiple_faces faces=%s", attempt_id, faces_count)
+                return payload, 200
+
+            align_crop = getattr(self.recognizer, "align_crop", None)
+            roi = align_crop(frame, face) if callable(align_crop) else None
+            if roi is None:
+                ts = int(time.time())
+                with self.lock:
+                    self.system_status["recognition_score"] = None
+                    self.system_status["face_updated_ts"] = ts
+                    self.system_status["analysis_state"] = "error"
+                payload = self._build_analysis_payload(
+                    ok=False,
+                    event="no_face",
+                    result="NO_FACE",
+                    user_id=None,
+                    user_name=None,
+                    confidence=None,
+                    timestamp=ts,
+                )
+                logger.info("recognition_cycle_end attempt_id=%s result=no_face_crop", attempt_id)
+                return payload, 200
 
             conf = db.get_config()
             predict_t0 = time.perf_counter()
-            label, confidence = self.recognizer.predict(roi)
+            label, score = self.recognizer.predict(roi)
             predict_ms = (time.perf_counter() - predict_t0) * 1000.0
             self.recognition_time_total_ms += predict_ms
             self.recognition_count += 1
             avg_ms = self.recognition_time_total_ms / max(1, self.recognition_count)
 
-            user_id, user_name, result = self._apply_access_decision(label, confidence, conf)
-            db.insert_access(user_id=user_id, confianza=confidence, resultado=result)
+            user_id, user_name, result = self._apply_access_decision(label, score, conf)
+            db.insert_access(user_id=user_id, confianza=score, resultado=result)
 
             ts = int(time.time())
             event = self._event_from_result(result)
@@ -548,7 +596,9 @@ class AccessService:
             with self.lock:
                 self.system_status["last_user"] = user_name
                 self.system_status["last_result"] = result
-                self.system_status["last_confidence"] = confidence
+                self.system_status["last_confidence"] = score
+                self.system_status["recognition_score"] = score
+                self.system_status["recognition_metric"] = self.recognizer.recognition_metric
                 self.system_status["timestamp"] = ts
                 self.system_status["avg_recognition_ms"] = round(avg_ms, 2)
                 self.system_status["failed_attempts_consecutive"] = self.consecutive_denied
@@ -557,10 +607,10 @@ class AccessService:
                 self.system_status["analysis_state"] = analysis_state
 
             logger.info(
-                "recognition_cycle_end attempt_id=%s result=%s confidence=%s avg_recognition_ms=%.2f",
+                "recognition_cycle_end attempt_id=%s result=%s score=%s avg_recognition_ms=%.2f",
                 attempt_id,
                 result,
-                confidence,
+                score,
                 avg_ms,
             )
 
@@ -570,7 +620,7 @@ class AccessService:
                 result=result,
                 user_id=user_id,
                 user_name=user_name,
-                confidence=confidence,
+                confidence=score,
                 timestamp=ts,
             )
             return payload, 200
@@ -599,11 +649,11 @@ class AccessService:
         frame = self.camera.get_frame()
         if frame is None:
             return None
-        gray = self._to_gray(frame)
-        face, _ = self._detect_faces(gray)
-        if face is None:
+        face, faces_count = self._detect_faces(frame)
+        if face is None or faces_count != 1:
             return None
-        roi = self._normalize_roi(gray, face)
+        align_crop = getattr(self.recognizer, "align_crop", None)
+        roi = align_crop(frame, face) if callable(align_crop) else None
         if roi is None:
             return None
 
@@ -630,6 +680,7 @@ class AccessService:
                 user_id=user_id,
                 pose=self.pose_heuristic,
                 user_name=user_name,
+                face_aligner=getattr(self.recognizer, "align_crop", None),
             )
             logger.info("enrollment_started user_id=%s", user_id)
             return {
@@ -720,7 +771,11 @@ class AccessService:
             if self.enrollment_session is not session or session.samples_persisted:
                 return
             try:
-                db.insert_samples_with_pose(session.user_id, session.all_sample_paths)
+                db.insert_samples_with_pose(
+                    session.user_id,
+                    session.all_sample_paths,
+                    preprocess_mode=config.sface_preprocess_mode,
+                )
             except Exception:
                 logger.exception("enrollment_db_insert_failed user_id=%s", session.user_id)
                 raise
@@ -731,6 +786,22 @@ class AccessService:
                 session.user_id,
                 session.total_captured,
             )
+
+    def purge_legacy_face_samples(self) -> dict[str, Any]:
+        with self.analysis_lock:
+            result = db.purge_face_samples(
+                dataset_dir=config.dataset_dir,
+                model_path=config.model_path,
+            )
+            self.recognizer.loaded = False
+            with self.lock:
+                self.system_status["model"] = "not_loaded"
+                self.system_status["last_user"] = "-"
+                self.system_status["last_result"] = "MUESTRAS_PURGADAS"
+                self.system_status["last_confidence"] = None
+                self.system_status["recognition_score"] = None
+                self.system_status["timestamp"] = int(time.time())
+            return result
 
     def _build_idle_enrollment_status(self) -> dict[str, Any]:
         steps_summary = [
@@ -762,7 +833,7 @@ class AccessService:
             "steps_summary": steps_summary,
             "guidance": {
                 "instruction": "Selecciona una persona para iniciar",
-                "hint": "Prepara la iluminacion y centra el rostro antes de comenzar.",
+                "hint": "Prepara la iluminacion y deja el rostro visible antes de comenzar.",
                 "arrow": None,
                 "hold_progress": 0.0,
                 "pose_matched": False,
@@ -770,6 +841,7 @@ class AccessService:
                 "brightness_ok": True,
                 "multiple_faces": False,
                 "glasses_detected": False,
+                "face_bbox": None,
             },
             "actions": {
                 "can_retry": False,
@@ -814,6 +886,9 @@ class AccessService:
                 self.system_status["analysis_busy"] = False
                 self.system_status["face_detected"] = False
                 self.system_status["face_bbox"] = None
+                self.system_status["faces_count"] = 0
+                self.system_status["primary_face_bbox"] = None
+                self.system_status["recognition_score"] = None
             logger.info("backend_sleep_enabled camera_kept_running=true camera_active=%s", cam_active)
             return {"ok": True, "sleep_mode": True}
 
@@ -875,7 +950,6 @@ class AccessService:
         conf = db.get_config()
         threshold = float(conf["umbral_confianza"])
         open_sec = int(conf["tiempo_apertura_seg"])
-        max_attempts = int(conf["max_intentos"])
 
         user_id = None
         user_name = "Desconocido"
@@ -888,19 +962,16 @@ class AccessService:
                 user_name = str(active_user["nombre"])
                 result = "AUTORIZADO"
                 self.consecutive_denied = 0
-                confidence_value = float(confidence if confidence is not None else max(1.0, threshold - 5.0))
+                confidence_value = float(confidence if confidence is not None else min(100.0, threshold + 10.0))
                 self.relay.open_for(open_sec)
                 self.gpio_activation_count += 1
             else:
-                confidence_value = float(confidence if confidence is not None else threshold + 10.0)
+                confidence_value = float(confidence if confidence is not None else max(0.0, threshold - 10.0))
                 result = "DENEGADO"
                 self.consecutive_denied += 1
         else:
-            confidence_value = float(confidence if confidence is not None else threshold + 10.0)
+            confidence_value = float(confidence if confidence is not None else max(0.0, threshold - 10.0))
             self.consecutive_denied += 1
-
-        if self.consecutive_denied >= max_attempts:
-            result = "DENEGADO_BLOQUEO"
 
         self.attempts_processed += 1
         db.insert_access(user_id=user_id, confianza=confidence_value, resultado=result)
@@ -909,6 +980,8 @@ class AccessService:
             self.system_status["last_user"] = user_name
             self.system_status["last_result"] = result
             self.system_status["last_confidence"] = confidence_value
+            self.system_status["recognition_score"] = confidence_value
+            self.system_status["recognition_metric"] = self.recognizer.recognition_metric
             self.system_status["timestamp"] = int(time.time())
             self.system_status["failed_attempts_consecutive"] = self.consecutive_denied
             self.system_status["attempts_processed"] = self.attempts_processed

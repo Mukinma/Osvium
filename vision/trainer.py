@@ -4,16 +4,16 @@ import cv2
 
 from config import config
 from database.db import db
-from vision.recognizer import LBPHRecognizer
+from vision.recognizer import SFaceRecognizer
 from vision.secure_storage import storage as _storage
 
 
 class FaceTrainer:
-    def __init__(self, recognizer: LBPHRecognizer):
+    def __init__(self, recognizer: SFaceRecognizer):
         self.recognizer = recognizer
 
     def train_from_dataset(self) -> dict:
-        samples = db.list_samples()
+        samples = db.list_samples(preprocess_mode=config.sface_preprocess_mode)
         images = []
         labels = []
 
@@ -21,15 +21,15 @@ class FaceTrainer:
             path = Path(sample["imagen_ref"])
             if not path.exists():
                 continue
-            image = _storage.read_image(path, flags=cv2.IMREAD_GRAYSCALE)
+            image = _storage.read_image(path, flags=cv2.IMREAD_COLOR)
             if image is None:
                 continue
-            image = cv2.resize(image, (200, 200))
+            image = cv2.resize(image, (112, 112))
             images.append(image)
             labels.append(int(sample["usuario_id"]))
 
         if not images:
-            raise ValueError("No hay muestras válidas para entrenar")
+            raise ValueError("Recaptura requerida: no hay muestras SFace limpias para entrenar")
 
         self.recognizer.train(images, labels)
         self.recognizer.save_model(config.model_path, _storage)

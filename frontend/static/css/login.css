@@ -410,22 +410,109 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-/* ── Recovery hint (decorative, no functionality) ──── */
-.login-recover {
-  margin-top: 16px;
-  font-size: 0.72rem;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.35);
-  text-align: center;
+/* ── Password recovery ─────────────────────────────── */
+.login-card [hidden] {
+  display: none !important;
 }
 
-.login-recover__phone {
-  color: #7aa6ff;
+.login-recover-link {
+  justify-self: center;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.5;
+  color: rgba(160, 190, 255, 0.9);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.login-recover-link:hover,
+.login-recover-link:focus-visible {
+  color: rgba(220, 232, 255, 0.98);
   text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: default;
+  text-underline-offset: 4px;
+}
+
+.login-recovery-view {
+  display: grid;
+  gap: 18px;
+  padding: 18px 2px 2px;
+}
+
+.login-recovery-view.is-hidden,
+.login-recover-link.is-hidden {
+  display: none;
+}
+
+.login-recovery-view h2 {
+  margin: 0;
+  color: rgba(235, 242, 255, 0.96);
+  font-size: clamp(1.7rem, 4.7vw, 2.25rem);
+  font-weight: 780;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.login-recovery-view p {
+  margin: 0;
+  max-width: 48ch;
+  color: rgba(203, 213, 225, 0.76);
+  font-size: clamp(0.98rem, 2.2vw, 1.14rem);
+  font-weight: 520;
+  line-height: 1.55;
+}
+
+.login-recovery-phone {
+  justify-self: start;
+  color: #fff;
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1.15;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.login-recovery-phone:hover,
+.login-recovery-phone:focus-visible {
+  color: #bfdbfe;
+}
+
+.login-recovery-phone.is-hidden {
+  display: none;
+}
+
+.login-recovery-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  min-height: 34px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(160, 190, 255, 0.9);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.login-recovery-back .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.login-recovery-back:hover,
+.login-recovery-back:focus-visible {
+  color: rgba(220, 232, 255, 0.98);
 }
 
 /* ── LIGHT THEME ────────────────────────────────────── */
@@ -559,12 +646,21 @@ html.theme-light .login-submit:hover {
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-html.theme-light .login-recover {
-  color: rgba(10, 30, 60, 0.42);
+html.theme-light .login-recover-link,
+html.theme-light .login-recovery-back {
+  color: #3b6fc2;
 }
 
-html.theme-light .login-recover__phone {
-  color: #3b6fc2;
+html.theme-light .login-recovery-view h2 {
+  color: rgba(5, 18, 40, 0.95);
+}
+
+html.theme-light .login-recovery-view p {
+  color: rgba(10, 30, 60, 0.58);
+}
+
+html.theme-light .login-recovery-phone {
+  color: #0d1e30;
 }
 
 /* ── MOBILE / TOUCH ─────────────────────────────────── */
@@ -726,7 +822,8 @@ html.theme-light .login-recover__phone {
 body.login-access-granted .login-head > div:last-child,
 body.login-access-granted .field-group,
 body.login-access-granted .login-actions,
-body.login-access-granted .login-recover,
+body.login-access-granted .login-recover-link,
+body.login-access-granted .login-recovery-view,
 body.login-access-granted .login-error,
 body.login-access-granted .hud-tl,
 body.login-access-granted .hud-tr,

@@ -67,7 +67,12 @@ class AppConfig:
     storage_encrypted: bool = _env_bool("CAMERAPI_STORAGE_ENCRYPTED", False)
 
     db_path: str = "database/camerapi.db"
-    model_path: str = "models/lbph_model.xml"
+    model_path: str = "models/sface_embeddings.npz"
+    legacy_lbph_model_path: str = "models/lbph_model.xml"
+    face_detection_model_path: str = "models/face_detection_yunet_2023mar.onnx"
+    face_recognition_model_path: str = "models/face_recognition_sface_2021dec.onnx"
+    sface_preprocess_mode: str = "sface_align_crop"
+    legacy_preprocess_mode: str = "legacy_bbox"
     dataset_dir: str = "dataset"
     logs_path: str = "logs/system.log"
 
@@ -88,6 +93,9 @@ class AppConfig:
     detect_min_neighbors: int = 5
     detect_min_size_w: int = 96
     detect_min_size_h: int = 96
+    yunet_score_threshold: float = float(os.getenv("CAMERAPI_YUNET_SCORE_THRESHOLD", "0.80"))
+    yunet_nms_threshold: float = float(os.getenv("CAMERAPI_YUNET_NMS_THRESHOLD", "0.30"))
+    yunet_top_k: int = _clamp_int(_env_int("CAMERAPI_YUNET_TOP_K", 5000), 1, 20000)
 
     recognition_cooldown_ms: int = 200
     roi_absdiff_threshold: float = 6.0

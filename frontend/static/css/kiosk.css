@@ -377,7 +377,7 @@ html.theme-dark .kiosk-camera.camera-active.camera-pulse::after {
 }
 
 .kiosk-camera__stage.is-granted::after {
-  background: rgba(34, 197, 94, 0.14);
+  background: rgba(37, 99, 235, 0.22);
 }
 
 .kiosk-camera__feed {
@@ -398,8 +398,9 @@ html.desktop-launch-pending .kiosk-camera__feed {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(380px, 65%);
-  min-width: 260px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
   aspect-ratio: 10 / 13;
   z-index: 5;
   pointer-events: none;
@@ -433,13 +434,13 @@ html.desktop-launch-pending .kiosk-camera__feed {
 }
 
 .face-guide.is-idle {
-  opacity: 0.64;
+  opacity: 0;
   color: rgba(255, 255, 255, 0.62);
   animation: guideBreathing 3.5s ease-in-out infinite;
 }
 
 .face-guide.is-searching {
-  opacity: 0.55;
+  opacity: 0;
   color: rgba(255, 255, 255, 0.5);
   animation: guideBreathing 2.8s ease-in-out infinite;
 }
@@ -472,7 +473,7 @@ html.desktop-launch-pending .kiosk-camera__feed {
 }
 
 .face-guide.is-ready {
-  opacity: 0.92;
+  opacity: 0;
   color: rgba(var(--success-rgb), 0.8);
   animation: guidePulseReady 1.8s ease-in-out infinite;
 }
@@ -505,8 +506,8 @@ html.desktop-launch-pending .kiosk-camera__feed {
 }
 
 .face-guide.is-granted {
-  opacity: 0.95;
-  color: #22C55E;
+  opacity: 0;
+  color: #2563EB;
   animation: none;
 }
 
@@ -519,7 +520,7 @@ html.desktop-launch-pending .kiosk-camera__feed {
 }
 
 .face-guide.is-granted .face-guide__stroke {
-  stroke: #22C55E;
+  stroke: #2563EB;
   stroke-width: 5;
 }
 
@@ -630,6 +631,176 @@ html.desktop-launch-pending .kiosk-camera__feed {
   opacity: 0.16;
   z-index: 6;
   pointer-events: none;
+}
+
+.face-box-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+
+.face-box {
+  position: absolute;
+  border: 3px solid rgba(125, 211, 252, 0.95);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(8, 15, 30, 0.6),
+    0 0 24px rgba(14, 165, 233, 0.42);
+  transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.face-box.is-hidden {
+  opacity: 0;
+}
+
+.face-box.is-granted {
+  border-color: rgba(59, 130, 246, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(8, 15, 30, 0.62),
+    0 0 30px rgba(37, 99, 235, 0.54);
+}
+
+.face-box.is-warning {
+  border-color: rgba(248, 113, 113, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(8, 15, 30, 0.62),
+    0 0 30px rgba(239, 68, 68, 0.46);
+}
+
+.face-box.is-denied {
+  border-color: rgba(251, 113, 133, 0.95);
+}
+
+.welcome-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: clamp(24px, 5vw, 56px);
+  background: rgba(29, 78, 216, 0.78);
+  color: #fff;
+  text-align: center;
+  transition: opacity 180ms ease;
+}
+
+.welcome-overlay__icon {
+  width: clamp(70px, 12vw, 128px);
+  height: clamp(70px, 12vw, 128px);
+  color: #fff;
+  filter: drop-shadow(0 18px 34px rgba(2, 6, 23, 0.26));
+}
+
+.welcome-overlay__icon.is-hidden {
+  display: none;
+}
+
+.welcome-overlay.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.welcome-overlay--blue {
+  background:
+    linear-gradient(180deg, rgba(37, 99, 235, 0.86), rgba(14, 116, 144, 0.74)),
+    rgba(29, 78, 216, 0.74);
+}
+
+.welcome-overlay span {
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 800;
+  line-height: 0.95;
+}
+
+.welcome-overlay strong {
+  max-width: min(92%, 900px);
+  font-size: clamp(1.8rem, 5vw, 4.2rem);
+  font-weight: 700;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.support-help-button {
+  position: fixed;
+  right: clamp(18px, 3vw, 34px);
+  bottom: clamp(18px, 3vw, 34px);
+  z-index: 40;
+  min-height: 56px;
+  padding: 0 24px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(6, 11, 24, 0.78);
+  color: rgba(255, 255, 255, 0.94);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+}
+
+.support-help-button.is-hidden {
+  display: none;
+}
+
+.support-help-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.support-help-dialog.is-hidden {
+  display: none;
+}
+
+.support-help-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.62);
+}
+
+.support-help-dialog__panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  width: min(92vw, 420px);
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(7, 14, 28, 0.96);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
+}
+
+.support-help-dialog__label {
+  color: rgba(203, 213, 225, 0.76);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.support-help-dialog__message {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.86);
+  font-size: clamp(1rem, 3vw, 1.18rem);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+#supportHelpPhone {
+  color: #fff;
+  font-size: clamp(1.7rem, 5vw, 2.4rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .face-indicator::before,
@@ -848,6 +1019,18 @@ html.theme-light .user-photo {
     inset 0 0 20px rgba(255, 255, 255, 0.1);
 }
 
+.kiosk-info__receipt-icon {
+  width: clamp(48px, 6vw, 74px);
+  height: clamp(48px, 6vw, 74px);
+  margin-bottom: clamp(12px, 2vw, 18px);
+  color: var(--success);
+  filter: drop-shadow(0 0 18px rgba(34, 197, 94, 0.34));
+}
+
+.kiosk-info__receipt-icon.is-hidden {
+  display: none;
+}
+
 .kiosk-info__header {
   display: flex;
   flex-direction: column;
@@ -876,6 +1059,14 @@ html.theme-light .user-photo {
   font-size: clamp(1.3rem, 2vw, 1.6rem);
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.75);
+}
+
+.kiosk-info__meta {
+  margin: 12px 0 0;
+  color: rgba(203, 213, 225, 0.68);
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .kiosk-info__footer {
@@ -935,11 +1126,10 @@ html.theme-light .user-photo {
 }
 
 .kiosk-info.is-granted .kiosk-info__title {
-  font-size: clamp(2.4rem, 5.4vw, 4rem);
-  line-height: 1;
-  letter-spacing: 0.035em;
-  white-space: pre-line;
-  text-transform: uppercase;
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  line-height: 1.02;
+  letter-spacing: 0;
+  text-transform: none;
   word-break: break-word;
   overflow-wrap: anywhere;
 }

@@ -95,6 +95,8 @@
     /* Info panel — descriptions with <br><strong> */
     'Identidad verificada<br><strong>acceso autorizado</strong>':
       'Identity verified<br><strong>access authorized</strong>',
+    'Puerta desbloqueada<br><strong>Ingreso autorizado</strong>':
+      'Door unlocked<br><strong>Access authorized</strong>',
     'Identidad no autorizada<br><strong>acceso denegado</strong>':
       'Identity not authorized<br><strong>access denied</strong>',
     'Demasiados intentos<br><strong>acceso restringido</strong>':
@@ -139,8 +141,14 @@
     'Usuario': 'Username',
     'Contraseña': 'Password',
     'Entrar': 'Sign in',
-    '¿Olvidaste tu contraseña? Llama al <span class="login-recover__phone">314 161 1779</span> para recuperarla.':
-      'Forgot your password? Call <span class="login-recover__phone">314 161 1779</span> to recover it.',
+    '¿Olvidaste tu contraseña?': 'Forgot your password?',
+    'Recuperar acceso': 'Recover access',
+    'Comunícate con el centro encargado para recuperar la contraseña de administración.':
+      'Contact the responsible center to recover the administrator password.',
+    'Comunícate con el encargado del centro para recuperar la contraseña de administración.':
+      'Contact the center manager to recover the administrator password.',
+    'Volver a iniciar sesión': 'Back to sign in',
+    'Registro de acceso': 'Access record',
 
     /* ──────────────────────────────────────────────
        Admin — sidebar + topbar
@@ -260,12 +268,14 @@
     'Permisivo': 'Permissive',
     'Más tolerante': 'More tolerant',
     'Personalizado': 'Custom',
-    'Intentos antes de bloquear': 'Attempts before lockout',
-    'Intentos máximos': 'Max attempts',
+    'Intentos fallidos': 'Failed attempts',
+    'Intentos de referencia': 'Reference attempts',
     'Reducir': 'Decrease',
     'Aumentar': 'Increase',
-    'Los intentos fallidos consecutivos bloquean el acceso temporalmente.':
-      'Consecutive failed attempts temporarily lock access.',
+    'El reconocimiento no se bloquea; este valor se conserva para diagnóstico y compatibilidad.':
+      'Recognition is not blocked; this value is kept for diagnostics and compatibility.',
+    'En caso de no poder acceder debido a problemas de reconocimiento, llama al departamento encargado.':
+      'If you cannot access due to recognition issues, call the responsible department.',
 
     /* Admin — puerta */
     'Tiempo de apertura': 'Open duration',

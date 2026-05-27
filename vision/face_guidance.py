@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 
 class FaceGuidanceEngine:
-    """Maquina de estados para guiar al usuario a alinear su rostro."""
+    """Maquina de estados para detectar una sola persona sin marco fijo."""
 
     TARGET_CX = 0.50
     TARGET_CY = 0.42
@@ -140,19 +140,19 @@ class FaceGuidanceEngine:
         if not model_loaded:
             self._reset_tracking()
             self._transition("idle")
-            return self._build("Coloca tu rostro dentro de la guía")
+            return self._build("Sistema preparandose")
 
         if faces_count > 1:
             self._reset_tracking()
             self._transition("detected_misaligned")
-            return self._build("Solo debe haber una persona")
+            return self._build("Debe salir la otra persona")
 
         if not face_detected or face_bbox is None:
             elapsed_since_face = now - self._last_face_seen_ms
             if self._state in ("aligned", "hold_steady", "ready", "detected_misaligned"):
                 if elapsed_since_face < self.LOST_GRACE_MS:
                     self._transition("lost")
-                    return self._build("Rostro fuera de la zona de captura")
+                    return self._build("Rostro no visible")
                 self._reset_tracking()
                 self._transition("searching")
                 return self._build("Buscando rostro…")
@@ -161,7 +161,7 @@ class FaceGuidanceEngine:
                     self._reset_tracking()
                     self._transition("searching")
                     return self._build("Buscando rostro…")
-                return self._build("Rostro fuera de la zona de captura")
+                return self._build("Rostro no visible")
             self._transition("searching")
             return self._build("Buscando rostro…")
 
@@ -178,36 +178,10 @@ class FaceGuidanceEngine:
 
         ox, oy, sr = self._compute_offsets()
         stability = self._compute_stability(self._smooth_cx, self._smooth_cy)
-
-        currently_aligned = self._state in ("aligned", "hold_steady", "ready")
-
-        if currently_aligned:
-            still_ok = self._is_within_hysteresis(ox, oy, sr)
-            if not still_ok:
-                self._aligned_since_ms = None
-                self._transition("detected_misaligned")
-                return self._build(self._direction_message(ox, oy, sr), ox, oy, sr, stability)
-
-            elapsed_aligned = now - (self._aligned_since_ms or now)
-
-            if elapsed_aligned >= self.STEADY_WINDOW_MS and stability >= 0.6:
-                self._transition("ready")
-                return self._build("Listo para escaneo", ox, oy, sr, stability)
-            if elapsed_aligned >= self.HOLD_THRESHOLD_MS:
-                self._transition("hold_steady")
-                return self._build("Mantente quieto", ox, oy, sr, stability)
-            self._transition("aligned")
-            return self._build("Rostro alineado", ox, oy, sr, stability)
-
-        if self._is_within_align(ox, oy, sr):
-            if self._aligned_since_ms is None:
-                self._aligned_since_ms = now
-            self._transition("aligned")
-            return self._build("Rostro alineado", ox, oy, sr, stability)
-
-        self._aligned_since_ms = None
-        self._transition("detected_misaligned")
-        return self._build(self._direction_message(ox, oy, sr), ox, oy, sr, stability)
+        if self._aligned_since_ms is None:
+            self._aligned_since_ms = now
+        self._transition("ready")
+        return self._build("Rostro detectado", ox, oy, sr, stability)
 
     def set_capturing(self) -> None:
         self._transition("capture_in_progress")
