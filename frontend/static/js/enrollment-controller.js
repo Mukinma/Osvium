@@ -7,12 +7,33 @@
 
 (function () {
   const STEP_PREVIEW = [
-    { name: 'normal', label: 'Rostro normal', icon: 'circle-dot', appearance_variant: 'normal' },
-    { name: 'cabello_recogido', label: 'Cabello recogido', icon: 'circle-dot', appearance_variant: 'cabello_recogido' },
-    { name: 'casco', label: 'Con casco', icon: 'circle-dot', appearance_variant: 'casco' },
+    { name: 'normal', label: 'Rostro normal', icon: 'normal', appearance_variant: 'normal' },
+    { name: 'cabello_recogido', label: 'Cabello recogido', icon: 'comb-inline', appearance_variant: 'cabello_recogido' },
+    { name: 'casco', label: 'Con casco', icon: 'helmet-inline', appearance_variant: 'casco' },
   ];
 
   const POLL_MS = 350;
+
+  const STEP_PRESENTATION = {
+    normal: {
+      label: 'Rostro normal',
+      continueTitle: 'Capturar rostro normal',
+      continueHint: 'Colócate frente a la cámara',
+      icon: 'normal',
+    },
+    cabello_recogido: {
+      label: 'Cabello recogido',
+      continueTitle: 'Ahora con el cabello recogido',
+      continueHint: 'Colócate frente a la cámara',
+      icon: 'comb-inline',
+    },
+    casco: {
+      label: 'Con casco',
+      continueTitle: 'Ahora con casco',
+      continueHint: 'Colócate frente a la cámara',
+      icon: 'helmet-inline',
+    },
+  };
 
   function tr(text) {
     try { return (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t(text) : text; }
@@ -27,6 +48,14 @@
   const stepCounter = document.getElementById('enrollStepCounter');
   const instruction = document.getElementById('enrollInstruction');
   const message = document.getElementById('enrollMessage');
+  const stepGuide = document.getElementById('enrollStepGuide');
+  const stepGuideIcon = document.getElementById('enrollStepGuideIcon');
+  const stepGuideTitle = document.getElementById('enrollStepGuideTitle');
+  const continueOverlay = document.getElementById('enrollContinueOverlay');
+  const continueIcon = document.getElementById('enrollContinueIcon');
+  const continueTitle = document.getElementById('enrollContinueTitle');
+  const continueHint = document.getElementById('enrollContinueHint');
+  const continueAction = document.getElementById('enrollContinueAction');
   const phasePill = document.getElementById('enrollPhasePill');
   const currentSamplesPill = document.getElementById('enrollCurrentSamples');
   const userMeta = document.getElementById('enrollUserMeta');
@@ -88,6 +117,7 @@
   let pendingUserId = null;
   let enterViewPromise = null;
   let animFrame = null;
+  let isContinuing = false;
 
   function buildFallbackIdleStatus() {
     return {
@@ -105,6 +135,10 @@
       samples_needed: 12,
       total_captured: 0,
       total_needed: STEP_PREVIEW.length * 12,
+      awaiting_continue: false,
+      continue_title: null,
+      continue_hint: null,
+      continue_action_label: 'Continuar',
       steps_summary: STEP_PREVIEW.map((step) => ({
         ...step,
         status: 'pending',
@@ -143,6 +177,25 @@
 
   function isRecoverableError(status = enrollmentStatus) {
     return status?.phase === 'recoverable_error';
+  }
+
+  function getStepVariant(status = enrollmentStatus) {
+    if (status?.appearance_variant) return String(status.appearance_variant);
+    const current = Number(status?.current_step);
+    const steps = Array.isArray(status?.steps_summary) ? status.steps_summary : [];
+    const fromStep = Number.isInteger(current) ? steps[current]?.appearance_variant || steps[current]?.name : '';
+    if (fromStep) return String(fromStep);
+    return 'normal';
+  }
+
+  function getStepPresentation(status = enrollmentStatus) {
+    const variant = getStepVariant(status);
+    return STEP_PRESENTATION[variant] || {
+      label: status?.step_label || status?.guidance?.instruction || 'Capturando rostro',
+      continueTitle: status?.continue_title || status?.step_label || 'Capturar rostro',
+      continueHint: status?.continue_hint || 'Colócate frente a la cámara',
+      icon: status?.step_icon || 'normal',
+    };
   }
 
   function getCurrentSelectedUserId() {
@@ -551,6 +604,70 @@
     });
   }
 
+  function iconMarkup(iconName) {
+    if (iconName === 'comb-inline') {
+      return `
+        <svg class="icon" data-step-icon="comb-inline" aria-hidden="true" viewBox="0 0 64 64" fill="none">
+          <path d="M14 20h36c3 0 5 2 5 5v8H9v-8c0-3 2-5 5-5Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M15 33v16M23 33v16M31 33v16M39 33v16M47 33v16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M18 15c5-4 14-4 19 0 4 3 9 3 13 0" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      `;
+    }
+    if (iconName === 'helmet-inline') {
+      return `
+        <svg class="icon" data-step-icon="helmet-inline" aria-hidden="true" viewBox="0 0 64 64" fill="none">
+          <path d="M12 37c0-12 9-22 20-22s20 10 20 22" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M24 17v15M40 17v15" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          <path d="M9 37h46c3 0 5 2 5 5v2H4v-2c0-3 2-5 5-5Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M18 44c3 6 8 9 14 9s11-3 14-9" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      `;
+    }
+    return `
+      <svg class="icon" data-step-icon="normal" aria-hidden="true">
+        <use href="/static/icons/lucide/lucide-sprite.svg#user"></use>
+      </svg>
+    `;
+  }
+
+  function renderStepIcon(target, iconName) {
+    if (!target) return;
+    target.innerHTML = iconMarkup(iconName);
+  }
+
+  function renderGuidedStepCard(status = enrollmentStatus) {
+    if (!stepGuide) return;
+    const show = isActivePhase(status);
+    stepGuide.hidden = !show;
+    stepGuide.classList.toggle('is-hidden', !show);
+    if (!show) return;
+
+    const presentation = getStepPresentation(status);
+
+    renderStepIcon(stepGuideIcon, presentation.icon);
+    if (stepGuideTitle) stepGuideTitle.textContent = tr(presentation.label || status.step_label || 'Rostro normal');
+  }
+
+  function renderContinueOverlay(status = enrollmentStatus) {
+    if (!continueOverlay) return;
+    const show = isActivePhase(status) && status.awaiting_continue === true;
+    const presentation = getStepPresentation(status);
+
+    continueOverlay.classList.toggle('is-hidden', !show);
+    continueOverlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+    if (!show) {
+      continueOverlay.disabled = true;
+      return;
+    }
+
+    renderStepIcon(continueIcon, presentation.icon);
+    if (continueTitle) continueTitle.textContent = tr(status.continue_title || presentation.continueTitle || 'Capturar rostro');
+    if (continueHint) continueHint.textContent = tr(status.continue_hint || presentation.continueHint || 'Colócate frente a la cámara');
+    if (continueAction) continueAction.textContent = tr(status.continue_action_label || 'Continuar');
+    continueOverlay.disabled = isContinuing;
+  }
+
   function setReadinessState(item, valueEl, badgeEl, options) {
     if (!item || !valueEl || !badgeEl) return;
     item.classList.remove('is-ready', 'is-warning', 'is-danger');
@@ -696,6 +813,8 @@
     if (stepCounter) stepCounter.textContent = totalSamplesText(enrollmentStatus);
     if (instruction) instruction.textContent = tr(enrollmentStatus.guidance?.instruction || 'Selecciona una persona para iniciar');
     if (message) message.textContent = tr(enrollmentStatus.guidance?.hint || '');
+    renderGuidedStepCard(enrollmentStatus);
+    renderContinueOverlay(enrollmentStatus);
 
     const steps = enrollmentStatus.steps_summary || buildFallbackIdleStatus().steps_summary;
     renderDots(steps);
@@ -865,6 +984,9 @@
 
   function resetUI() {
     stopPolling();
+    isContinuing = false;
+    continueOverlay?.classList.add('is-hidden');
+    continueOverlay?.setAttribute('aria-hidden', 'true');
     enrollmentStatus = buildFallbackIdleStatus();
     pendingUserId = userSelect.value || pendingUserId;
     applySnapshot(enrollmentStatus);
@@ -946,6 +1068,37 @@
         sub: error.message,
         cls: 'error',
       });
+    }
+  }
+
+  async function continueEnrollment() {
+    if (isContinuing || !isActivePhase() || enrollmentStatus.awaiting_continue !== true) return;
+    isContinuing = true;
+    renderContinueOverlay(enrollmentStatus);
+
+    try {
+      const result = await requestJson('/api/enrollment/continue', { method: 'POST' });
+      if (!result.ok) {
+        if (result.data?.phase) applySnapshot(result.data);
+        showAdminToastSafe({
+          text: 'No se pudo continuar',
+          sub: result.data?.error || 'La captura no esta pausada',
+          cls: 'warning',
+        });
+        return;
+      }
+
+      applySnapshot(result.data);
+      if (isActivePhase(result.data)) scheduleNextPoll(0);
+    } catch (error) {
+      showAdminToastSafe({
+        text: 'Error al continuar',
+        sub: error.message,
+        cls: 'error',
+      });
+    } finally {
+      isContinuing = false;
+      renderContinueOverlay(enrollmentStatus);
     }
   }
 
@@ -1086,6 +1239,10 @@
 
   retryBtn?.addEventListener('click', () => {
     void retryCurrentStep();
+  });
+
+  continueOverlay?.addEventListener('click', () => {
+    void continueEnrollment();
   });
 
   abortBtn?.addEventListener('click', () => {

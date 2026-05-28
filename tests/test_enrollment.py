@@ -41,7 +41,12 @@ def test_enrollment_session_starts_with_rehydratable_snapshot(tmp_path, monkeypa
     status = session.get_status()
 
     assert status["phase"] == "active"
-    assert status["state"] == "step_active"
+    assert status["state"] == "awaiting_continue"
+    assert status["awaiting_continue"] is True
+    assert status["continue_title"] == "Capturar rostro normal"
+    assert status["continue_hint"] == "Colócate frente a la cámara"
+    assert status["continue_action_label"] == "Continuar"
+    assert status["samples_this_step"] == 0
     assert status["user_name"] == "Ana Prueba"
     assert status["current_step"] == 0
     assert status["total_steps"] == len(ENROLLMENT_STEPS)
@@ -71,9 +76,47 @@ def test_retry_step_clears_only_current_step_files(tmp_path, monkeypatch):
 
     session.retry_step()
 
+    assert session.get_status()["state"] == "awaiting_continue"
     assert session.get_status()["samples_this_step"] == 0
     assert not first_path.exists()
     assert not second_path.exists()
+
+
+def test_paused_session_updates_face_without_capturing(tmp_path, monkeypatch):
+    session, pose, _dataset_dir = _make_session(tmp_path, monkeypatch)
+    frame = np.ones((120, 120, 3), dtype=np.uint8) * 255
+    gray = np.ones((120, 120), dtype=np.uint8) * 255
+    pose.matched = True
+
+    session.update(frame, gray, (10, 10, 40, 40), 1)
+    status = session.get_status()
+
+    assert status["state"] == "awaiting_continue"
+    assert status["awaiting_continue"] is True
+    assert status["samples_this_step"] == 0
+    assert status["guidance"]["face_detected"] is True
+    assert status["guidance"]["face_bbox"] is not None
+
+
+def test_continue_capture_enables_real_sample_capture(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "enrollment_samples_per_step", 1)
+    monkeypatch.setattr(config, "enrollment_hold_steady_ms", 0)
+    monkeypatch.setattr(config, "enrollment_brightness_threshold", 1.0)
+    session, pose, _dataset_dir = _make_session(tmp_path, monkeypatch)
+    session.face_aligner = lambda _frame, _face: np.ones((112, 112, 3), dtype=np.uint8) * 255
+    frame = np.ones((120, 120, 3), dtype=np.uint8) * 255
+    gray = np.ones((120, 120), dtype=np.uint8) * 255
+    pose.matched = True
+
+    assert session.continue_capture() is True
+    session.update(frame, gray, (10, 10, 40, 40), 1)
+    status = session.get_status()
+
+    assert session.total_captured == 1
+    assert status["current_step"] == 1
+    assert status["state"] == "awaiting_continue"
+    assert status["awaiting_continue"] is True
+    assert status["continue_title"] == "Ahora con el cabello recogido"
 
 
 def test_session_reports_multiple_faces_and_recovers_from_light_and_face_loss(tmp_path, monkeypatch):
@@ -81,6 +124,7 @@ def test_session_reports_multiple_faces_and_recovers_from_light_and_face_loss(tm
     frame = np.ones((120, 120, 3), dtype=np.uint8) * 255
     gray = np.ones((120, 120), dtype=np.uint8) * 255
 
+    assert session.continue_capture() is True
     session.update(frame, gray, (10, 10, 40, 40), 2)
     status = session.get_status()
     assert status["guidance"]["multiple_faces"] is True

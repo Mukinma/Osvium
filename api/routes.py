@@ -647,6 +647,17 @@ def enrollment_retry_step(request: Request):
     return JSONResponse(result, status_code=status_code)
 
 
+@router.post("/api/enrollment/continue")
+def enrollment_continue(request: Request):
+    _admin_write_required(request)
+    result = request.app.state.service.continue_enrollment()
+    status_code = 200 if result.get("ok") else 409 if result.get("error") in {
+        "enrollment_not_continuable",
+        "enrollment_not_waiting",
+    } else 404
+    return JSONResponse(result, status_code=status_code)
+
+
 @router.post("/api/enrollment/finish")
 def enrollment_finish(request: Request):
     _admin_write_required(request)

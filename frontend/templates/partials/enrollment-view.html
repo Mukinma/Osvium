@@ -110,6 +110,20 @@
       />
       <canvas id="enrollOverlay" class="enroll-overlay"></canvas>
 
+      <article id="enrollStepGuide" class="enroll-step-guide is-hidden" aria-live="polite" hidden>
+        <div class="enroll-step-guide__icon" id="enrollStepGuideIcon" aria-hidden="true"></div>
+        <div class="enroll-step-guide__copy">
+          <strong class="enroll-step-guide__title" id="enrollStepGuideTitle" data-i18n>Rostro normal</strong>
+        </div>
+      </article>
+
+      <button id="enrollContinueOverlay" class="enroll-continue-overlay is-hidden" type="button" aria-hidden="true">
+        <span class="enroll-continue-overlay__icon" id="enrollContinueIcon" aria-hidden="true"></span>
+        <strong class="enroll-continue-overlay__title" id="enrollContinueTitle" data-i18n>Capturar rostro normal</strong>
+        <span class="enroll-continue-overlay__hint" id="enrollContinueHint" data-i18n>Colócate frente a la cámara</span>
+        <span class="enroll-continue-overlay__action" id="enrollContinueAction" data-i18n>Continuar</span>
+      </button>
+
       <!-- Single guidance line at bottom of viewport -->
       <div class="enroll-vp-hud enroll-vp-hud--minimal" id="enrollHud" aria-live="polite">
         <p class="enroll-guidance-line" id="enrollMessage"></p>
