@@ -130,8 +130,9 @@ def test_open_desktop_window_difiere_fullscreen_y_despacha_ready(monkeypatch):
             captured["kwargs"] = kwargs
             return fake_window
 
-        def start(self, func=None, args=None, debug=False):
+        def start(self, func=None, args=None, localization=None, gui=None, debug=False, **_kwargs):
             captured["debug"] = debug
+            captured["gui"] = gui
             fake_window.events.initialized.fire(fake_window, "gtk")
             fake_window.events.shown.fire(fake_window)
             fake_window.events.loaded.fire(fake_window)
@@ -144,6 +145,8 @@ def test_open_desktop_window_difiere_fullscreen_y_despacha_ready(monkeypatch):
     assert captured["kwargs"]["hidden"] is False
     assert captured["kwargs"]["fullscreen"] is False
     assert captured["kwargs"]["background_color"] == desktop_launcher.WINDOW_BACKGROUND_COLOR
+    assert captured["debug"] is False
+    assert captured["gui"] == desktop_launcher.DESKTOP_GUI_BACKEND
     assert fake_window.actions[:2] == ["maximize", "toggle_fullscreen"]
     assert desktop_launcher.DESKTOP_READY_JS in fake_window.js_calls
 
@@ -155,7 +158,7 @@ def test_open_desktop_window_windowed_reaplica_resize(monkeypatch):
         def create_window(self, *args, **kwargs):
             return fake_window
 
-        def start(self, func=None, args=None, debug=False):
+        def start(self, func=None, args=None, localization=None, gui=None, debug=False, **_kwargs):
             fake_window.events.initialized.fire(fake_window)
             fake_window.events.shown.fire(fake_window)
             fake_window.events.loaded.fire(fake_window)
@@ -208,6 +211,27 @@ def test_install_linux_shortcuts_escribe_archivos(tmp_path):
     assert desktop_entry.exists()
     assert autostart_entry is not None and autostart_entry.exists()
     desktop_text = desktop_entry.read_text(encoding="utf-8")
-    assert "Name=Vireom" in desktop_text
+    assert "Name=Osvium" in desktop_text
     assert str(runner_path).replace(" ", "\\ ") in desktop_text
     assert str(icon_path).replace(" ", "\\ ") in desktop_text
+
+
+def test_install_linux_shortcuts_usa_logo_white_si_favicon_no_existe(tmp_path):
+    applications_dir = tmp_path / "applications"
+    autostart_dir = tmp_path / "autostart"
+    runner_path = tmp_path / "run_desktop.sh"
+    favicon_path = tmp_path / "favicon.svg"
+    logo_white_path = tmp_path / "logo-white.svg"
+    runner_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    logo_white_path.write_text("<svg />\n", encoding="utf-8")
+
+    desktop_entry, _ = install_linux_desktop_entry.install_linux_shortcuts(
+        applications_dir=applications_dir,
+        autostart_dir=autostart_dir,
+        enable_autostart=False,
+        runner_path=runner_path,
+        icon_path=favicon_path,
+    )
+
+    desktop_text = desktop_entry.read_text(encoding="utf-8")
+    assert str(logo_white_path).replace(" ", "\\ ") in desktop_text
