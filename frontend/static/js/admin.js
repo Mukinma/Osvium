@@ -534,7 +534,7 @@ function getPersonPrimaryAction(user) {
   if (samples <= 0) {
     const escapedName = escapeHtml(escapeJsString(user.nombre));
     return {
-      label: tr('Registrar rostro'),
+      label: tr('Registrar rostro robusto'),
       icon: 'camera-filled',
       tone: 'primary',
       action: `startEnrollForUser(${user.id}, '${escapedName}')`,
@@ -649,7 +649,7 @@ function renderPersonDetail(user, detail = null) {
     });
   } else if (samplesCount <= 0) {
     detailActions.push({
-      label: tr('Registrar rostro'),
+      label: tr('Registrar rostro robusto'),
       icon: 'camera-filled',
       action: `startEnrollForUser(${user.id}, '${escapedName}')`,
       variant: 'primary',
@@ -662,14 +662,14 @@ function renderPersonDetail(user, detail = null) {
       variant: 'primary',
     });
     detailActions.push({
-      label: tr('Registrar rostro'),
+      label: tr('Actualizar rostro'),
       icon: 'camera-filled',
       action: `startEnrollForUser(${user.id}, '${escapedName}')`,
       variant: 'secondary',
     });
   } else {
     detailActions.push({
-      label: tr('Registrar rostro'),
+      label: tr('Actualizar rostro'),
       icon: 'camera-filled',
       action: `startEnrollForUser(${user.id}, '${escapedName}')`,
       variant: 'secondary',

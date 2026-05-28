@@ -213,6 +213,7 @@ def _apply_test_config() -> None:
     routes_module.config.admin_user = "admin"
     routes_module.config.admin_password = "admin-pass"
     routes_module.config.debug = False
+    routes_module.db.get_admin_by_username = lambda username: None
 
 
 def _reset_limiter_state() -> None:

@@ -21,7 +21,27 @@ logger = logging.getLogger("camerapi.enrollment")
 
 
 ENROLLMENT_STEPS: list[dict[str, str]] = [
-    {"name": "center", "label": "Mira de frente", "icon": "circle-dot"},
+    {
+        "name": "normal",
+        "label": "Rostro normal",
+        "icon": "circle-dot",
+        "pose_type": "center",
+        "appearance_variant": "normal",
+    },
+    {
+        "name": "cabello_recogido",
+        "label": "Cabello recogido",
+        "icon": "circle-dot",
+        "pose_type": "center",
+        "appearance_variant": "cabello_recogido",
+    },
+    {
+        "name": "casco",
+        "label": "Con casco",
+        "icon": "circle-dot",
+        "pose_type": "center",
+        "appearance_variant": "casco",
+    },
 ]
 
 STATES = frozenset(
@@ -244,10 +264,11 @@ class EnrollmentSession:
             self._touch(now)
 
         step_name = self._step["name"]
-        if step_name == "center" and not self.pose.has_baseline:
+        pose_step_name = self._step.get("pose_type", step_name)
+        if pose_step_name == "center" and not self.pose.has_baseline:
             self.pose.set_baseline(bbox, frame_shape)
 
-        matched, guidance_msg = self.pose.check_step(step_name, hints)
+        matched, guidance_msg = self.pose.check_step(pose_step_name, hints)
         if not matched:
             self._state = "step_active"
             self._message = guidance_msg
@@ -309,7 +330,7 @@ class EnrollmentSession:
         roi_resized = cv2.resize(roi, (112, 112))
         step_name = self._step["name"]
         idx = len(self._step_samples) + 1
-        filename = f"enroll_{step_name}_{idx:03d}.jpg"
+        filename = f"enroll_{self._started_at_ms}_{step_name}_{idx:03d}.jpg"
         full_path = self._user_dir / filename
         _storage.write_image(full_path, roi_resized)
         return f"{config.dataset_dir}/user_{self.user_id}/{filename}"
@@ -349,6 +370,7 @@ class EnrollmentSession:
 
         self._current_step = next_idx
         self._hold_start_ms = None
+        self.pose.clear_baseline()
         self._state = "step_active"
         self._message = ENROLLMENT_STEPS[next_idx]["label"]
         self._touch(now)
@@ -386,12 +408,14 @@ class EnrollmentSession:
         return sum(len(paths) for paths in self._samples.values())
 
     @property
-    def all_sample_paths(self) -> list[tuple[str, str]]:
-        result: list[tuple[str, str]] = []
+    def all_sample_paths(self) -> list[tuple[str, str, str]]:
+        result: list[tuple[str, str, str]] = []
         for step_idx, paths in sorted(self._samples.items()):
-            pose_type = ENROLLMENT_STEPS[step_idx]["name"]
+            step_meta = ENROLLMENT_STEPS[step_idx]
+            pose_type = step_meta.get("pose_type", step_meta["name"])
+            appearance_variant = step_meta.get("appearance_variant", "normal")
             for path in paths:
-                result.append((path, pose_type))
+                result.append((path, pose_type, appearance_variant))
         return result
 
     def get_status(self) -> dict[str, Any]:
@@ -426,6 +450,7 @@ class EnrollmentSession:
                     "name": step_meta["name"],
                     "label": step_meta["label"],
                     "icon": step_meta["icon"],
+                    "appearance_variant": step_meta.get("appearance_variant", "normal"),
                     "status": status,
                     "samples": captured,
                     "needed": self.samples_per_step,
@@ -446,7 +471,7 @@ class EnrollmentSession:
 
         guidance_arrow = None
         if phase == "active" and self._state not in ("holding", "capturing") and self._faces_count <= 1:
-            guidance_arrow = PoseHeuristic.guidance_arrow(step["name"])
+            guidance_arrow = PoseHeuristic.guidance_arrow(step.get("pose_type", step["name"]))
 
         instruction = step["label"]
         if phase == "completed_review":
@@ -468,6 +493,7 @@ class EnrollmentSession:
             "step_name": step["name"],
             "step_label": step["label"],
             "step_icon": step["icon"],
+            "appearance_variant": step.get("appearance_variant", "normal"),
             "samples_this_step": len(step_samples),
             "samples_needed": self.samples_per_step,
             "total_captured": self.total_captured,

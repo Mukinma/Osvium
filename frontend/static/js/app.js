@@ -274,8 +274,25 @@ function closeSupportHelp() {
   supportHelpDialog?.setAttribute('aria-hidden', 'true');
 }
 
+function ensureFaceDepthField() {
+  if (!primaryFaceBox || primaryFaceBox.querySelector('.face-depth-field__sweep')) return;
+  primaryFaceBox.classList.remove('face-box');
+  primaryFaceBox.classList.add('face-depth-field');
+  primaryFaceBox.innerHTML = `
+    <span class="face-depth-field__shell"></span>
+    <span class="face-depth-field__line"></span>
+    <span class="face-depth-field__line"></span>
+    <span class="face-depth-field__line"></span>
+    <span class="face-depth-field__line"></span>
+    <span class="face-depth-field__line"></span>
+    <span class="face-depth-field__line"></span>
+    <span class="face-depth-field__sweep"></span>
+  `;
+}
+
 function updatePrimaryFaceBox(data, uiStateKey) {
   if (!primaryFaceBox) return;
+  ensureFaceDepthField();
   const bbox = data?.primary_face_bbox || data?.face_bbox;
   const reportedFacesCount = Number(data?.faces_count || 0);
   const facesCount = reportedFacesCount > 0 ? reportedFacesCount : (data?.face_detected ? 1 : 0);
@@ -287,10 +304,21 @@ function updatePrimaryFaceBox(data, uiStateKey) {
     return;
   }
 
-  primaryFaceBox.style.left = `${Math.round(Number(bbox.x || 0) * 10000) / 100}%`;
-  primaryFaceBox.style.top = `${Math.round(Number(bbox.y || 0) * 10000) / 100}%`;
-  primaryFaceBox.style.width = `${Math.round(Number(bbox.w || 0) * 10000) / 100}%`;
-  primaryFaceBox.style.height = `${Math.round(Number(bbox.h || 0) * 10000) / 100}%`;
+  const x = Number(bbox.x || 0);
+  const y = Number(bbox.y || 0);
+  const w = Number(bbox.w || 0);
+  const h = Number(bbox.h || 0);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const previousSize = Math.max(w, h) * 1.65;
+  const top = cy - previousSize / 2;
+  const bottom = y + h;
+  const size = Math.max(0, bottom - top);
+
+  primaryFaceBox.style.left = `${Math.round((cx - size / 2) * 10000) / 100}%`;
+  primaryFaceBox.style.top = `${Math.round(top * 10000) / 100}%`;
+  primaryFaceBox.style.width = `${Math.round(size * 10000) / 100}%`;
+  primaryFaceBox.style.height = `${Math.round(size * 10000) / 100}%`;
   primaryFaceBox.classList.remove('is-hidden', 'is-granted', 'is-warning', 'is-denied');
   if (facesCount > 1) {
     primaryFaceBox.classList.add('is-warning');

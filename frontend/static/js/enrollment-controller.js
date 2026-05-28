@@ -7,7 +7,9 @@
 
 (function () {
   const STEP_PREVIEW = [
-    { name: 'center', label: 'Mira de frente', icon: 'circle-dot' },
+    { name: 'normal', label: 'Rostro normal', icon: 'circle-dot', appearance_variant: 'normal' },
+    { name: 'cabello_recogido', label: 'Cabello recogido', icon: 'circle-dot', appearance_variant: 'cabello_recogido' },
+    { name: 'casco', label: 'Con casco', icon: 'circle-dot', appearance_variant: 'casco' },
   ];
 
   const POLL_MS = 350;
@@ -98,15 +100,16 @@
       step_name: null,
       step_label: null,
       step_icon: null,
+      appearance_variant: null,
       samples_this_step: 0,
-      samples_needed: 20,
+      samples_needed: 12,
       total_captured: 0,
-      total_needed: STEP_PREVIEW.length * 20,
+      total_needed: STEP_PREVIEW.length * 12,
       steps_summary: STEP_PREVIEW.map((step) => ({
         ...step,
         status: 'pending',
         samples: 0,
-        needed: 5,
+        needed: 12,
       })),
       guidance: {
         instruction: 'Selecciona una persona para iniciar',
@@ -329,32 +332,59 @@
     ctx.restore();
   }
 
-  function drawDynamicFaceBox(ctx, width, height, bbox, guidance) {
+  function drawDepthField(ctx, width, height, bbox, guidance) {
     const x = Number(bbox.x || 0) * width;
     const y = Number(bbox.y || 0) * height;
     const w = Number(bbox.w || 0) * width;
     const h = Number(bbox.h || 0) * height;
     if (w <= 0 || h <= 0) return null;
 
+    const cx = x + w / 2;
+    const faceCy = y + h / 2;
+    const previousRadius = Math.max(w, h) * 0.82;
+    const top = faceCy - previousRadius;
+    const bottom = y + h;
+    const radius = Math.max(0, bottom - top) / 2;
+    const cy = top + radius;
+    const sweepRotation = (Date.now() / 760) % (Math.PI * 2);
+
     ctx.save();
-    if (guidance.multiple_faces) {
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.84)';
-      ctx.shadowColor = 'rgba(239, 68, 68, 0.38)';
-    } else if (!guidance.brightness_ok) {
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.82)';
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.34)';
-    } else if (guidance.pose_matched) {
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.86)';
-      ctx.shadowColor = 'rgba(34, 197, 94, 0.42)';
-    } else {
-      ctx.strokeStyle = 'rgba(125, 211, 252, 0.86)';
-      ctx.shadowColor = 'rgba(14, 165, 233, 0.34)';
-    }
+    ctx.strokeStyle = guidance.pose_matched ? 'rgba(191, 219, 254, 0.94)' : 'rgba(96, 165, 250, 0.88)';
+    ctx.shadowColor = 'rgba(37, 99, 235, 0.48)';
     ctx.lineWidth = 3;
-    ctx.shadowBlur = 14;
-    ctx.strokeRect(x, y, w, h);
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = 'rgba(147, 197, 253, 0.56)';
+    for (const scale of [0.72, 0.46]) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * scale, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(191, 219, 254, 0.52)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (Math.PI / 6) * i;
+      const inner = radius * 0.24;
+      const outer = radius * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
+      ctx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(219, 234, 254, 0.84)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 1.04, sweepRotation, sweepRotation + Math.PI * 0.42);
+    ctx.stroke();
     ctx.restore();
-    return { x, y, w, h };
+    return { x, y, w, h, cx, cy, radius };
   }
 
   function drawOverlay() {
@@ -370,16 +400,18 @@
     if (!isActivePhase() || !guidance) return;
 
     const drawnBox = guidance.face_bbox
-      ? drawDynamicFaceBox(ctx, width, height, guidance.face_bbox, guidance)
+      ? drawDepthField(ctx, width, height, guidance.face_bbox, guidance)
       : null;
 
     if (drawnBox && enrollmentStatus.state === 'holding' && guidance.hold_progress > 0) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.92)';
-      ctx.lineWidth = 4;
-      ctx.shadowColor = 'rgba(34, 197, 94, 0.5)';
-      ctx.shadowBlur = 10;
-      ctx.strokeRect(drawnBox.x - 4, drawnBox.y - 4, drawnBox.w + 8, drawnBox.h + 8);
+      ctx.strokeStyle = 'rgba(219, 234, 254, 0.94)';
+      ctx.lineWidth = 5;
+      ctx.shadowColor = 'rgba(96, 165, 250, 0.58)';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(drawnBox.cx, drawnBox.cy, drawnBox.radius * (0.84 + guidance.hold_progress * 0.2), 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -454,7 +486,7 @@
     if (status.phase === 'completed_review') return 'Revision final';
     if (status.phase === 'recoverable_error') return 'Sesion detenida';
     if (status.current_step == null) return 'Preparacion';
-    return tr('Capturando de frente');
+    return tr(status.step_label || 'Capturando rostro');
   }
 
   function currentSamplesText(status = enrollmentStatus) {
@@ -745,6 +777,16 @@
     // Brief pause so the user sees "Listo"
     await new Promise((r) => setTimeout(r, 1500));
 
+    // Finish first so completed samples replace the user's previous samples
+    // before the trainer reads from the dataset index.
+    try {
+      await requestJson('/api/enrollment/finish', { method: 'POST' });
+    } catch (_) {
+      isAutoFinishing = false;
+      resetUI();
+      return;
+    }
+
     // Auto-train
     try {
       const trainResult = await requestJson('/api/train', { method: 'POST' });
@@ -769,13 +811,6 @@
         cls: 'warning',
         timeout: 3400,
       });
-    }
-
-    // Finish session
-    try {
-      await requestJson('/api/enrollment/finish', { method: 'POST' });
-    } catch (_) {
-      // Best effort
     }
 
     isAutoFinishing = false;
@@ -973,6 +1008,17 @@
     if (finishBtn) finishBtn.disabled = true;
 
     try {
+      const finishResult = await requestJson('/api/enrollment/finish', { method: 'POST' });
+      if (!finishResult.ok) {
+        if (finishResult.data?.phase) applySnapshot(finishResult.data);
+        showAdminToastSafe({
+          text: 'No se pudo cerrar la sesion',
+          sub: finishResult.data?.error || 'Intenta nuevamente',
+          cls: 'error',
+        });
+        return;
+      }
+
       if (trainFirst) {
         const trainResult = await requestJson('/api/train', { method: 'POST' });
         if (trainResult.ok) {
@@ -989,17 +1035,6 @@
             timeout: 3400,
           });
         }
-      }
-
-      const finishResult = await requestJson('/api/enrollment/finish', { method: 'POST' });
-      if (!finishResult.ok) {
-        if (finishResult.data?.phase) applySnapshot(finishResult.data);
-        showAdminToastSafe({
-          text: 'No se pudo cerrar la sesion',
-          sub: finishResult.data?.error || 'Intenta nuevamente',
-          cls: 'error',
-        });
-        return;
       }
 
       resetUI();

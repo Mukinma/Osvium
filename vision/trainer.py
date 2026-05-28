@@ -16,6 +16,7 @@ class FaceTrainer:
         samples = db.list_samples(preprocess_mode=config.sface_preprocess_mode)
         images = []
         labels = []
+        variants = []
 
         for sample in samples:
             path = Path(sample["imagen_ref"])
@@ -27,11 +28,12 @@ class FaceTrainer:
             image = cv2.resize(image, (112, 112))
             images.append(image)
             labels.append(int(sample["usuario_id"]))
+            variants.append(str(sample.get("appearance_variant") or "normal"))
 
         if not images:
             raise ValueError("Recaptura requerida: no hay muestras SFace limpias para entrenar")
 
-        self.recognizer.train(images, labels)
+        self.recognizer.train(images, labels, variants=variants)
         self.recognizer.save_model(config.model_path, _storage)
 
         return {

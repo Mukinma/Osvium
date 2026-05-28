@@ -102,6 +102,7 @@ function createDom({ initialView = 'personas', fetchImpl, confirmImpl = () => tr
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
+    arc: vi.fn(),
     ellipse: vi.fn(),
     stroke: vi.fn(),
     strokeRect: vi.fn(),
@@ -328,6 +329,13 @@ describe('enrollment controller', () => {
     expect(window.confirm).not.toHaveBeenCalled();
     expect(fetchImpl).toHaveBeenCalledWith('/api/train', expect.objectContaining({ method: 'POST', credentials: 'same-origin' }));
     expect(fetchImpl).toHaveBeenCalledWith('/api/enrollment/finish', expect.objectContaining({ method: 'POST', credentials: 'same-origin' }));
+    const finishCall = fetchImpl.mock.invocationCallOrder[
+      fetchImpl.mock.calls.findIndex(([url]) => url === '/api/enrollment/finish')
+    ];
+    const trainCall = fetchImpl.mock.invocationCallOrder[
+      fetchImpl.mock.calls.findIndex(([url]) => url === '/api/train')
+    ];
+    expect(finishCall).toBeLessThan(trainCall);
     expect(window.showPersonasListMode).toHaveBeenCalled();
   });
 
@@ -363,7 +371,7 @@ describe('enrollment controller', () => {
     expect(document.getElementById('enrollSummaryUser').textContent).toContain('Ada Lovelace');
   });
 
-  it('draws a dynamic face box instead of the fixed centered oval', async () => {
+  it('draws the blue depth field instead of a rectangular face box', async () => {
     const activeSnapshot = {
       ...buildActiveSnapshot(),
       guidance: {
@@ -384,12 +392,19 @@ describe('enrollment controller', () => {
       return createResponse({}, false, 404);
     });
 
-    const { window, canvasContext } = createDom({ fetchImpl });
+    const { window, document, canvasContext } = createDom({ fetchImpl });
     window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
     await flushAsync();
     await flushAsync();
 
     expect(canvasContext.ellipse).not.toHaveBeenCalled();
-    expect(canvasContext.strokeRect).toHaveBeenCalled();
+    expect(canvasContext.strokeRect).not.toHaveBeenCalled();
+    expect(canvasContext.arc).toHaveBeenCalled();
+    expect(canvasContext.lineTo).toHaveBeenCalled();
+    const overlay = document.getElementById('enrollOverlay');
+    const faceWidth = 0.24 * overlay.width;
+    const faceHeight = 0.34 * overlay.height;
+    const oldRadius = Math.max(faceWidth, faceHeight) * 0.82;
+    expect(canvasContext.arc.mock.calls[0][2]).toBeCloseTo((oldRadius + faceHeight / 2) / 2, 4);
   });
 });

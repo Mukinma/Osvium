@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import threading
 
 import cv2
 import numpy as np
@@ -65,11 +66,52 @@ def test_enrollment_captures_sface_aligned_color_sample(tmp_path, monkeypatch):
     session.update(frame, gray, face, 1)
 
     assert calls and calls[0][1] is face
-    assert session.state == "completed"
-    [relative_path] = [path for path, _pose in session.all_sample_paths]
+    assert session.total_captured == 1
+    [relative_path] = [path for path, _pose, _variant in session.all_sample_paths]
     saved = cv2.imread(str(Path(relative_path)))
     assert saved.shape == (112, 112, 3)
     assert int(saved[0, 0, 2]) > 180
+
+
+def test_enrollment_captures_required_appearance_variants(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "dataset_dir", str(tmp_path / "dataset"))
+    monkeypatch.setattr(config, "enrollment_samples_per_step", 1)
+    monkeypatch.setattr(config, "enrollment_hold_steady_ms", 0)
+    monkeypatch.setattr(config, "enrollment_brightness_threshold", 1.0)
+
+    frame = np.full((180, 220, 3), 255, dtype=np.uint8)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    face = FaceDetection(
+        bbox=(40, 30, 70, 90),
+        landmarks=np.array([[52, 54], [91, 55], [70, 78], [56, 105], [92, 106]], dtype=np.float32),
+        score=0.92,
+    )
+
+    def align_crop(_frame, _face):
+        return np.full((112, 112, 3), 210, dtype=np.uint8)
+
+    session = EnrollmentSession(
+        user_id=9,
+        pose=_FakePose(),
+        user_name="Ada",
+        face_aligner=align_crop,
+    )
+
+    assert [step["name"] for step in session.get_status()["steps_summary"]] == [
+        "normal",
+        "cabello_recogido",
+        "casco",
+    ]
+
+    for _ in range(3):
+        session.update(frame, gray, face, 1)
+
+    assert session.state == "completed"
+    assert [variant for _path, _pose, variant in session.all_sample_paths] == [
+        "normal",
+        "cabello_recogido",
+        "casco",
+    ]
 
 
 def test_recognizer_rejects_index_without_clean_preprocess_metadata(tmp_path, monkeypatch):
@@ -112,17 +154,24 @@ def test_trainer_uses_only_sface_align_crop_samples(tmp_path, monkeypatch):
         def list_samples(self, user_id=None, preprocess_mode=None):
             assert preprocess_mode == "sface_align_crop"
             return [
-                {"usuario_id": 4, "imagen_ref": str(clean_path), "preprocess_mode": "sface_align_crop"},
+                {
+                    "usuario_id": 4,
+                    "imagen_ref": str(clean_path),
+                    "preprocess_mode": "sface_align_crop",
+                    "appearance_variant": "casco",
+                },
             ]
 
     class FakeRecognizer:
         def __init__(self):
             self.images = None
             self.labels = None
+            self.variants = None
 
-        def train(self, images, labels):
+        def train(self, images, labels, variants=None):
             self.images = images
             self.labels = labels
+            self.variants = variants
 
         def save_model(self, *args, **kwargs):
             pass
@@ -135,6 +184,7 @@ def test_trainer_uses_only_sface_align_crop_samples(tmp_path, monkeypatch):
     assert result["samples_used"] == 1
     assert result["unique_users"] == 1
     assert recognizer.labels == [4]
+    assert recognizer.variants == ["casco"]
     assert recognizer.images[0].shape == (112, 112, 3)
 
 
@@ -183,3 +233,123 @@ def test_purge_face_samples_removes_files_rows_and_model(tmp_path):
     assert database.fetch_one("SELECT COUNT(*) AS n FROM accesos")["n"] == 1
     assert not sample.exists()
     assert not model_path.exists()
+
+
+def test_database_stores_and_replaces_user_samples_by_appearance_variant(tmp_path):
+    db_path = tmp_path / "camerapi.sqlite"
+    database = Database(str(db_path), schema_path="database/schema.sql")
+    database.init_db()
+    user_id = database.create_user("Ada")
+    dataset_root = tmp_path / "dataset"
+
+    old_sample = dataset_root / f"user_{user_id}" / "old.jpg"
+    old_sample.parent.mkdir(parents=True)
+    old_sample.write_bytes(b"old")
+    new_sample = dataset_root / f"user_{user_id}" / "new.jpg"
+    new_sample.write_bytes(b"new")
+
+    database.insert_sample_with_pose(
+        user_id,
+        str(old_sample.relative_to(tmp_path)),
+        "center",
+        preprocess_mode=config.sface_preprocess_mode,
+        appearance_variant="normal",
+    )
+    database.insert_access(user_id, 91.0, "AUTORIZADO")
+
+    result = database.replace_user_face_samples(
+        user_id,
+        [(str(new_sample.relative_to(tmp_path)), "center", "casco")],
+        preprocess_mode=config.sface_preprocess_mode,
+        dataset_dir=str(dataset_root),
+    )
+
+    rows = database.list_samples(user_id=user_id, preprocess_mode=config.sface_preprocess_mode)
+    assert result["deleted_samples"] == 1
+    assert result["inserted_samples"] == 1
+    assert len(rows) == 1
+    assert rows[0]["imagen_ref"] == str(new_sample.relative_to(tmp_path))
+    assert rows[0]["appearance_variant"] == "casco"
+    assert database.fetch_one("SELECT COUNT(*) AS n FROM accesos WHERE usuario_id=?", (user_id,))["n"] == 1
+    assert not old_sample.exists()
+    assert new_sample.exists()
+
+
+def test_recognizer_trains_multiple_centroids_per_user_variant(tmp_path, monkeypatch):
+    import vision.recognizer as recognizer_module
+
+    model_path = tmp_path / "sface.onnx"
+    index_path = tmp_path / "sface_embeddings.npz"
+    model_path.write_bytes(b"onnx")
+    monkeypatch.setattr(
+        recognizer_module.cv2,
+        "FaceRecognizerSF_create",
+        lambda *args, **kwargs: _FakeSFace(),
+    )
+
+    normal = np.full((112, 112, 3), 255, dtype=np.uint8)
+    helmet = np.zeros((112, 112, 3), dtype=np.uint8)
+    recognizer = recognizer_module.SFaceRecognizer(
+        model_path=str(model_path),
+        embedding_path=str(index_path),
+    )
+
+    recognizer.train(
+        [normal, helmet],
+        [7, 7],
+        variants=["normal", "casco"],
+    )
+    recognizer.save_model()
+
+    loaded = recognizer_module.SFaceRecognizer(
+        model_path=str(model_path),
+        embedding_path=str(index_path),
+    )
+    assert loaded.load_model()
+
+    label, score = loaded.predict(helmet)
+    assert label == 7
+    assert score >= 99.0
+    assert loaded.last_match_variant == "casco"
+    assert loaded.sample_counts[7] == 2
+
+
+def test_completed_enrollment_status_does_not_persist_until_finish(monkeypatch):
+    import main as main_module
+
+    service = main_module.AccessService.__new__(main_module.AccessService)
+    service.enrollment_session = SimpleNamespace(
+        state="completed",
+        samples_persisted=False,
+        get_status=lambda: {"state": "completed", "phase": "completed_review"},
+    )
+    calls = []
+    monkeypatch.setattr(service, "_persist_completed_enrollment", lambda session: calls.append(session))
+
+    status = service.get_enrollment_status()
+
+    assert status["state"] == "completed"
+    assert calls == []
+
+
+def test_abort_completed_unpersisted_enrollment_removes_new_files(monkeypatch):
+    import main as main_module
+
+    calls = []
+    session = SimpleNamespace(
+        state="completed",
+        samples_persisted=False,
+        user_id=7,
+        abort=lambda: calls.append("abort"),
+        clear_all_files=lambda: calls.append("clear"),
+    )
+    service = main_module.AccessService.__new__(main_module.AccessService)
+    service.enrollment_lock = threading.Lock()
+    service.enrollment_session = session
+    service.pose_heuristic = SimpleNamespace(clear_baseline=lambda: None)
+
+    result = service.abort_enrollment()
+
+    assert result["ok"] is True
+    assert calls == ["abort", "clear"]
+    assert service.enrollment_session is None
