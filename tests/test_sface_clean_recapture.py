@@ -63,6 +63,7 @@ def test_enrollment_captures_sface_aligned_color_sample(tmp_path, monkeypatch):
         score=0.92,
     )
 
+    assert session.continue_capture() is True
     session.update(frame, gray, face, 1)
 
     assert calls and calls[0][1] is face
@@ -103,7 +104,10 @@ def test_enrollment_captures_required_appearance_variants(tmp_path, monkeypatch)
         "casco",
     ]
 
-    for _ in range(3):
+    for expected_step in range(3):
+        assert session.get_status()["current_step"] == expected_step
+        assert session.get_status()["awaiting_continue"] is True
+        assert session.continue_capture() is True
         session.update(frame, gray, face, 1)
 
     assert session.state == "completed"

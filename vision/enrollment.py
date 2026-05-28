@@ -47,6 +47,7 @@ ENROLLMENT_STEPS: list[dict[str, str]] = [
 STATES = frozenset(
     {
         "idle",
+        "awaiting_continue",
         "step_active",
         "holding",
         "capturing",
@@ -80,12 +81,12 @@ class EnrollmentSession:
         self.face_lost_timeout_ms: int = config.enrollment_face_lost_timeout_ms
 
         now = self._now()
-        self._state: str = "step_active"
+        self._state: str = "awaiting_continue"
         self._current_step: int = 0
         self._samples: dict[int, list[str]] = {}
         self._hold_start_ms: Optional[float] = None
         self._last_face_ms: float = now
-        self._message: str = ENROLLMENT_STEPS[0]["label"]
+        self._message: str = "Colócate frente a la cámara"
         self._faces_count: int = 0
         self._glasses_detected: bool = False
         self._face_bbox: Optional[dict[str, float]] = None
@@ -115,6 +116,26 @@ class EnrollmentSession:
 
     def _touch(self, now: Optional[float] = None) -> None:
         self._updated_at_ms = int(now if now is not None else self._now())
+
+    def _continue_title(self) -> str:
+        variant = self._step.get("appearance_variant", self._step["name"])
+        titles = {
+            "normal": "Capturar rostro normal",
+            "cabello_recogido": "Ahora con el cabello recogido",
+            "casco": "Ahora con casco",
+        }
+        return titles.get(variant, f"Capturar {self._step['label'].lower()}")
+
+    def continue_capture(self) -> bool:
+        with self._lock:
+            if self._state != "awaiting_continue":
+                return False
+            self._state = "step_active"
+            self._message = self._step["label"]
+            self._hold_start_ms = None
+            self.pose.clear_baseline()
+            self._touch()
+            return True
 
     def _detect_glasses(self, gray: np.ndarray, face: tuple[int, int, int, int]) -> bool:
         """Detect glasses using eye cascades comparison.
@@ -219,6 +240,10 @@ class EnrollmentSession:
 
         if face is None or faces_count == 0:
             self._face_bbox = None
+            if self._state == "awaiting_continue":
+                self._message = "Colócate frente a la cámara"
+                self._touch(now)
+                return
             elapsed = now - self._last_face_ms
             if elapsed >= self.face_lost_timeout_ms:
                 self._state = "face_lost"
@@ -230,6 +255,12 @@ class EnrollmentSession:
         self._last_face_ms = now
         bbox = self._bbox_tuple(face)
         self._face_bbox = self._normalize_bbox(bbox, gray.shape)
+
+        if self._state == "awaiting_continue":
+            self._message = "Colócate frente a la cámara"
+            self._hold_start_ms = None
+            self._touch(now)
+            return
 
         if self._state == "face_lost":
             self._state = "step_active"
@@ -371,8 +402,8 @@ class EnrollmentSession:
         self._current_step = next_idx
         self._hold_start_ms = None
         self.pose.clear_baseline()
-        self._state = "step_active"
-        self._message = ENROLLMENT_STEPS[next_idx]["label"]
+        self._state = "awaiting_continue"
+        self._message = "Colócate frente a la cámara"
         self._touch(now)
         logger.info("enrollment_step_advance user_id=%s step=%s", self.user_id, ENROLLMENT_STEPS[next_idx]["name"])
 
@@ -384,8 +415,8 @@ class EnrollmentSession:
             self._delete_paths(list(self._samples.get(current_step, [])))
             self._samples[current_step] = []
             self._hold_start_ms = None
-            self._state = "step_active"
-            self._message = self._step["label"]
+            self._state = "awaiting_continue"
+            self._message = "Colócate frente a la cámara"
             self._touch()
             logger.info("enrollment_retry_step user_id=%s step=%s", self.user_id, self._step["name"])
 
@@ -470,7 +501,7 @@ class EnrollmentSession:
         can_train = phase == "completed_review"
 
         guidance_arrow = None
-        if phase == "active" and self._state not in ("holding", "capturing") and self._faces_count <= 1:
+        if phase == "active" and self._state not in ("awaiting_continue", "holding", "capturing") and self._faces_count <= 1:
             guidance_arrow = PoseHeuristic.guidance_arrow(step.get("pose_type", step["name"]))
 
         instruction = step["label"]
@@ -498,6 +529,10 @@ class EnrollmentSession:
             "samples_needed": self.samples_per_step,
             "total_captured": self.total_captured,
             "total_needed": self.samples_per_step * len(ENROLLMENT_STEPS),
+            "awaiting_continue": self._state == "awaiting_continue",
+            "continue_title": self._continue_title(),
+            "continue_hint": "Colócate frente a la cámara",
+            "continue_action_label": "Continuar",
             "steps_summary": steps_summary,
             "guidance": {
                 "instruction": instruction,

@@ -1,3 +1,3 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080">
-  <path d="M360,0L720,0L900,180L720,360L1080,360L1080,720L720,720L900,900L720,1080L360,1080L0,720L0,360L360,0ZM360,360L720,360L720,720L360,720L360,360Z" fill="#144089"/>
+<svg width="100%" height="100%" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <path d="M360,0L720,0L900,180L720,360L1080,360L1080,720L720,720L900,900L720,1080L360,1080L0,720L0,360L360,0ZM360,360L720,360L720,720L360,720L360,360Z" style="fill:white;stroke:white;stroke-width:1px;"/>
 </svg>

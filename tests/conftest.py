@@ -56,6 +56,10 @@ class _DummyService:
             "samples_needed": 5,
             "total_captured": 0,
             "total_needed": 35,
+            "awaiting_continue": False,
+            "continue_title": None,
+            "continue_hint": None,
+            "continue_action_label": "Continuar",
             "steps_summary": [],
             "guidance": {
                 "instruction": "Selecciona una persona para iniciar",
@@ -80,31 +84,37 @@ class _DummyService:
     def _active_enrollment_status(self, user_id: int):
         return {
             "phase": "active",
-            "state": "step_active",
+            "state": "awaiting_continue",
             "user_id": user_id,
             "user_name": f"Usuario {user_id}",
             "current_step": 0,
             "total_steps": 7,
-            "step_name": "center",
-            "step_label": "Mira de frente",
+            "step_name": "normal",
+            "step_label": "Rostro normal",
             "step_icon": "circle-dot",
+            "appearance_variant": "normal",
             "samples_this_step": 0,
             "samples_needed": 5,
             "total_captured": 0,
             "total_needed": 35,
+            "awaiting_continue": True,
+            "continue_title": "Capturar rostro normal",
+            "continue_hint": "Colócate frente a la cámara",
+            "continue_action_label": "Continuar",
             "steps_summary": [
                 {
-                    "name": "center",
-                    "label": "Mira de frente",
+                    "name": "normal",
+                    "label": "Rostro normal",
                     "icon": "circle-dot",
+                    "appearance_variant": "normal",
                     "status": "active",
                     "samples": 0,
                     "needed": 5,
                 }
             ],
             "guidance": {
-                "instruction": "Mira de frente",
-                "hint": "Sigue la guia en pantalla",
+                "instruction": "Rostro normal",
+                "hint": "Colócate frente a la cámara",
                 "arrow": None,
                 "hold_progress": 0.0,
                 "pose_matched": False,
@@ -186,6 +196,18 @@ class _DummyService:
     def retry_enrollment_step(self):
         if not self._enrollment_status:
             return {**self._idle_enrollment_status(), "ok": False, "error": "no_active_session"}
+        return {**self._enrollment_status, "ok": True}
+
+    def continue_enrollment(self):
+        if not self._enrollment_status:
+            return {**self._idle_enrollment_status(), "ok": False, "error": "no_active_session"}
+        if not self._enrollment_status.get("awaiting_continue"):
+            return {**self._enrollment_status, "ok": False, "error": "enrollment_not_waiting"}
+        self._enrollment_status = {
+            **self._enrollment_status,
+            "state": "step_active",
+            "awaiting_continue": False,
+        }
         return {**self._enrollment_status, "ok": True}
 
     def finish_enrollment(self):

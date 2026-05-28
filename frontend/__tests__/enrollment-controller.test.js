@@ -17,22 +17,23 @@ function buildActiveSnapshot() {
     user_id: 7,
     user_name: 'Ada Lovelace',
     current_step: 1,
-    total_steps: 7,
-    step_name: 'tilt_left',
-    step_label: 'Inclina hacia la izquierda',
-    step_icon: 'arrow-left',
+    total_steps: 3,
+    step_name: 'cabello_recogido',
+    step_label: 'Cabello recogido',
+    step_icon: 'circle-dot',
+    appearance_variant: 'cabello_recogido',
     samples_this_step: 2,
-    samples_needed: 5,
-    total_captured: 7,
-    total_needed: 35,
+    samples_needed: 12,
+    total_captured: 14,
+    total_needed: 36,
     steps_summary: [
-      { name: 'center', label: 'Mira de frente', icon: 'circle-dot', status: 'complete', samples: 5, needed: 5 },
-      { name: 'tilt_left', label: 'Inclina hacia la izquierda', icon: 'arrow-left', status: 'active', samples: 2, needed: 5 },
-      { name: 'tilt_right', label: 'Inclina hacia la derecha', icon: 'arrow-right', status: 'pending', samples: 0, needed: 5 },
+      { name: 'normal', label: 'Rostro normal', icon: 'circle-dot', appearance_variant: 'normal', status: 'complete', samples: 12, needed: 12 },
+      { name: 'cabello_recogido', label: 'Cabello recogido', icon: 'circle-dot', appearance_variant: 'cabello_recogido', status: 'active', samples: 2, needed: 12 },
+      { name: 'casco', label: 'Con casco', icon: 'circle-dot', appearance_variant: 'casco', status: 'pending', samples: 0, needed: 12 },
     ],
     guidance: {
-      instruction: 'Inclina hacia la izquierda',
-      hint: 'Sigue la guia en pantalla',
+      instruction: 'Cabello recogido',
+      hint: 'Mantén el rostro visible y espera la captura',
       arrow: 'left',
       hold_progress: 0.2,
       pose_matched: false,
@@ -46,6 +47,10 @@ function buildActiveSnapshot() {
       can_finish: false,
       can_train: false,
     },
+    awaiting_continue: false,
+    continue_title: 'Ahora con el cabello recogido',
+    continue_hint: 'Colócate frente a la cámara',
+    continue_action_label: 'Continuar',
     started_at: 100,
     updated_at: 200,
   };
@@ -131,6 +136,16 @@ function createDom({ initialView = 'personas', fetchImpl, confirmImpl = () => tr
               <div class="enrollment-viewport" id="enrollViewport">
                 <img id="enrollStream" src="/api/stream" />
                 <canvas id="enrollOverlay"></canvas>
+                <article id="enrollStepGuide">
+                  <div id="enrollStepGuideIcon"></div>
+                  <strong id="enrollStepGuideTitle"></strong>
+                </article>
+                <button id="enrollContinueOverlay" class="is-hidden" type="button">
+                  <span id="enrollContinueIcon"></span>
+                  <strong id="enrollContinueTitle"></strong>
+                  <span id="enrollContinueHint"></span>
+                  <span id="enrollContinueAction"></span>
+                </button>
                 <div id="enrollHud">
                   <span id="enrollStepBadge"></span>
                   <span id="enrollStepCounter"></span>
@@ -265,6 +280,208 @@ describe('enrollment controller', () => {
     expect(document.getElementById('enrollPhasePill').textContent).toBe('Guiado');
     expect(document.getElementById('enrollRetryBtn').hidden).toBe(false);
     expect(fetchImpl).toHaveBeenCalledWith('/api/enrollment/status', expect.any(Object));
+  });
+
+  it('shows a visible guided step card for the hair-tied variant', async () => {
+    const activeSnapshot = buildActiveSnapshot();
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/users') {
+        return createResponse([{ id: 7, nombre: 'Ada Lovelace' }]);
+      }
+      if (url === '/api/status') {
+        return createResponse({ camera: 'online', model: 'loaded' });
+      }
+      if (url === '/api/enrollment/status') {
+        return createResponse(activeSnapshot);
+      }
+      return createResponse({}, false, 404);
+    });
+
+    const { window, document } = createDom({ fetchImpl });
+    window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
+    await flushAsync();
+
+    expect(document.getElementById('enrollStepGuide').hidden).toBe(false);
+    expect(document.getElementById('enrollStepGuideTitle').textContent).toBe('Cabello recogido');
+    expect(document.getElementById('enrollStepGuide').textContent).not.toContain('foto');
+    expect(document.getElementById('enrollStepGuide').textContent).not.toContain('Paso');
+    expect(document.getElementById('enrollStepGuideIcon').querySelector('[data-step-icon="comb-inline"]')).not.toBeNull();
+    expect(document.getElementById('enrollTotalLabel').textContent).toBe('14 de 36 fotos');
+  });
+
+  it('shows the first guided step as a normal face capture', async () => {
+    const activeSnapshot = {
+      ...buildActiveSnapshot(),
+      current_step: 0,
+      step_name: 'normal',
+      step_label: 'Rostro normal',
+      step_icon: 'circle-dot',
+      appearance_variant: 'normal',
+      samples_this_step: 0,
+      total_captured: 0,
+      steps_summary: [
+        { name: 'normal', label: 'Rostro normal', icon: 'circle-dot', appearance_variant: 'normal', status: 'active', samples: 0, needed: 12 },
+        { name: 'cabello_recogido', label: 'Cabello recogido', icon: 'circle-dot', appearance_variant: 'cabello_recogido', status: 'pending', samples: 0, needed: 12 },
+        { name: 'casco', label: 'Con casco', icon: 'circle-dot', appearance_variant: 'casco', status: 'pending', samples: 0, needed: 12 },
+      ],
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/users') {
+        return createResponse([{ id: 7, nombre: 'Ada Lovelace' }]);
+      }
+      if (url === '/api/status') {
+        return createResponse({ camera: 'online', model: 'loaded' });
+      }
+      if (url === '/api/enrollment/status') {
+        return createResponse(activeSnapshot);
+      }
+      return createResponse({}, false, 404);
+    });
+
+    const { window, document } = createDom({ fetchImpl });
+    window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
+    await flushAsync();
+
+    expect(document.getElementById('enrollStepGuideTitle').textContent).toBe('Rostro normal');
+    expect(document.getElementById('enrollStepGuideIcon').querySelector('[data-step-icon="normal"]')).not.toBeNull();
+  });
+
+  it('uses a helmet step card for the hard-hat variant even when backend sends the generic icon', async () => {
+    const activeSnapshot = {
+      ...buildActiveSnapshot(),
+      current_step: 2,
+      step_name: 'casco',
+      step_label: 'Con casco',
+      step_icon: 'circle-dot',
+      appearance_variant: 'casco',
+      samples_this_step: 0,
+      total_captured: 24,
+      steps_summary: [
+        { name: 'normal', label: 'Rostro normal', icon: 'circle-dot', appearance_variant: 'normal', status: 'complete', samples: 12, needed: 12 },
+        { name: 'cabello_recogido', label: 'Cabello recogido', icon: 'circle-dot', appearance_variant: 'cabello_recogido', status: 'complete', samples: 12, needed: 12 },
+        { name: 'casco', label: 'Con casco', icon: 'circle-dot', appearance_variant: 'casco', status: 'active', samples: 0, needed: 12 },
+      ],
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/users') {
+        return createResponse([{ id: 7, nombre: 'Ada Lovelace' }]);
+      }
+      if (url === '/api/status') {
+        return createResponse({ camera: 'online', model: 'loaded' });
+      }
+      if (url === '/api/enrollment/status') {
+        return createResponse(activeSnapshot);
+      }
+      return createResponse({}, false, 404);
+    });
+
+    const { window, document } = createDom({ fetchImpl });
+    window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
+    await flushAsync();
+
+    expect(document.getElementById('enrollStepGuideTitle').textContent).toBe('Con casco');
+    expect(document.getElementById('enrollStepGuideIcon').querySelector('[data-step-icon="helmet-inline"]')).not.toBeNull();
+  });
+
+  it('shows a large manual continue overlay before the normal capture starts', async () => {
+    const pausedSnapshot = {
+      ...buildActiveSnapshot(),
+      current_step: 0,
+      state: 'awaiting_continue',
+      step_name: 'normal',
+      step_label: 'Rostro normal',
+      appearance_variant: 'normal',
+      samples_this_step: 0,
+      total_captured: 0,
+      awaiting_continue: true,
+      continue_title: 'Capturar rostro normal',
+      continue_hint: 'Colócate frente a la cámara',
+      continue_action_label: 'Continuar',
+      steps_summary: [
+        { name: 'normal', label: 'Rostro normal', icon: 'circle-dot', appearance_variant: 'normal', status: 'active', samples: 0, needed: 12 },
+        { name: 'cabello_recogido', label: 'Cabello recogido', icon: 'circle-dot', appearance_variant: 'cabello_recogido', status: 'pending', samples: 0, needed: 12 },
+        { name: 'casco', label: 'Con casco', icon: 'circle-dot', appearance_variant: 'casco', status: 'pending', samples: 0, needed: 12 },
+      ],
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/users') {
+        return createResponse([{ id: 7, nombre: 'Ada Lovelace' }]);
+      }
+      if (url === '/api/status') {
+        return createResponse({ camera: 'online', model: 'loaded' });
+      }
+      if (url === '/api/enrollment/status') {
+        return createResponse(pausedSnapshot);
+      }
+      return createResponse({}, false, 404);
+    });
+
+    const { window, document } = createDom({ fetchImpl });
+    window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
+    await flushAsync();
+
+    expect(document.getElementById('enrollContinueOverlay').classList.contains('is-hidden')).toBe(false);
+    expect(document.getElementById('enrollContinueTitle').textContent).toBe('Capturar rostro normal');
+    expect(document.getElementById('enrollContinueHint').textContent).toBe('Colócate frente a la cámara');
+    expect(document.getElementById('enrollContinueAction').textContent).toBe('Continuar');
+    expect(document.getElementById('enrollContinueIcon').querySelector('[data-step-icon="normal"]')).not.toBeNull();
+  });
+
+  it('continues the paused enrollment when the overlay is tapped', async () => {
+    const pausedSnapshot = {
+      ...buildActiveSnapshot(),
+      state: 'awaiting_continue',
+      awaiting_continue: true,
+      continue_title: 'Ahora con el cabello recogido',
+      continue_hint: 'Colócate frente a la cámara',
+      continue_action_label: 'Continuar',
+    };
+    const resumedSnapshot = {
+      ...buildActiveSnapshot(),
+      state: 'step_active',
+      awaiting_continue: false,
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/users') return createResponse([{ id: 7, nombre: 'Ada Lovelace' }]);
+      if (url === '/api/status') return createResponse({ camera: 'online', model: 'loaded' });
+      if (url === '/api/enrollment/status') return createResponse(pausedSnapshot);
+      if (url === '/api/enrollment/continue') return createResponse({ ...resumedSnapshot, ok: true });
+      return createResponse({}, false, 404);
+    });
+
+    const { window, document } = createDom({ fetchImpl });
+    window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
+    await flushAsync();
+
+    document.getElementById('enrollContinueOverlay').click();
+    await flushAsync();
+
+    expect(fetchImpl).toHaveBeenCalledWith('/api/enrollment/continue', expect.objectContaining({ method: 'POST' }));
+    expect(document.getElementById('enrollContinueOverlay').classList.contains('is-hidden')).toBe(true);
+  });
+
+  it('shows the hair-tied continue overlay when that step is paused', async () => {
+    const pausedSnapshot = {
+      ...buildActiveSnapshot(),
+      state: 'awaiting_continue',
+      awaiting_continue: true,
+      continue_title: 'Ahora con el cabello recogido',
+      continue_hint: 'Colócate frente a la cámara',
+      continue_action_label: 'Continuar',
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/users') return createResponse([{ id: 7, nombre: 'Ada Lovelace' }]);
+      if (url === '/api/status') return createResponse({ camera: 'online', model: 'loaded' });
+      if (url === '/api/enrollment/status') return createResponse(pausedSnapshot);
+      return createResponse({}, false, 404);
+    });
+
+    const { window, document } = createDom({ fetchImpl });
+    window.dispatchEvent(new window.CustomEvent('admin:viewchange', { detail: { viewId: 'enrolamiento' } }));
+    await flushAsync();
+
+    expect(document.getElementById('enrollContinueTitle').textContent).toBe('Ahora con el cabello recogido');
+    expect(document.getElementById('enrollContinueIcon').querySelector('[data-step-icon="comb-inline"]')).not.toBeNull();
   });
 
   it('refetches the session snapshot when leaving and returning to the view', async () => {

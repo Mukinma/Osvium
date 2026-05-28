@@ -289,9 +289,41 @@ def test_enrollment_start_devuelve_snapshot_rehidratable(client, monkeypatch):
     payload = response.json()
     assert payload["ok"] is True
     assert payload["phase"] == "active"
-    assert payload["state"] == "step_active"
+    assert payload["state"] == "awaiting_continue"
+    assert payload["awaiting_continue"] is True
+    assert payload["continue_title"] == "Capturar rostro normal"
     assert payload["user_id"] == 1
     assert payload["actions"]["can_abort"] is True
+
+
+def test_enrollment_continue_requiere_csrf_y_reanuda(client, monkeypatch):
+    monkeypatch.setattr(routes_module.db, "get_user", lambda user_id: {"id": user_id, "nombre": "Ada"})
+    csrf_token = _login_admin(client)
+    client.post(
+        "/api/enrollment/start",
+        json={"user_id": 1},
+        headers=_csrf_headers(csrf_token),
+    )
+
+    forbidden = client.post("/api/enrollment/continue")
+    assert forbidden.status_code == 403
+
+    response = client.post("/api/enrollment/continue", headers=_csrf_headers(csrf_token))
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["state"] == "step_active"
+    assert payload["awaiting_continue"] is False
+
+
+def test_enrollment_continue_rechaza_sin_sesion(client):
+    csrf_token = _login_admin(client)
+
+    response = client.post("/api/enrollment/continue", headers=_csrf_headers(csrf_token))
+
+    assert response.status_code == 404
+    assert response.json()["error"] == "no_active_session"
 
 
 def test_enrollment_finish_limpia_sesion_terminal(client):

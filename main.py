@@ -746,6 +746,31 @@ class AccessService:
             "ok": True,
         }
 
+    def continue_enrollment(self) -> dict[str, Any]:
+        session = self.enrollment_session
+        if session is None:
+            return {
+                **self._build_idle_enrollment_status(),
+                "ok": False,
+                "error": "no_active_session",
+            }
+        if session.is_terminal:
+            return {
+                **session.get_status(),
+                "ok": False,
+                "error": "enrollment_not_continuable",
+            }
+        if not session.continue_capture():
+            return {
+                **session.get_status(),
+                "ok": False,
+                "error": "enrollment_not_waiting",
+            }
+        return {
+            **session.get_status(),
+            "ok": True,
+        }
+
     def finish_enrollment(self) -> dict[str, Any]:
         with self.enrollment_lock:
             session = self.enrollment_session
@@ -841,6 +866,10 @@ class AccessService:
             "samples_needed": config.enrollment_samples_per_step,
             "total_captured": 0,
             "total_needed": config.enrollment_samples_per_step * len(ENROLLMENT_STEPS),
+            "awaiting_continue": False,
+            "continue_title": None,
+            "continue_hint": None,
+            "continue_action_label": "Continuar",
             "steps_summary": steps_summary,
             "guidance": {
                 "instruction": "Selecciona una persona para iniciar",
