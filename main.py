@@ -82,6 +82,7 @@ class AccessService:
             "primary_face_bbox": None,
             "recognition_score": None,
             "recognition_metric": self.recognizer.recognition_metric,
+            "recognition_variant": None,
             "face_updated_ts": 0,
             "camera_frame_width": config.frame_width,
             "camera_frame_height": config.frame_height,
@@ -389,6 +390,7 @@ class AccessService:
             primary_face_bbox = self.system_status.get("primary_face_bbox")
             recognition_score = self.system_status.get("recognition_score")
             recognition_metric = self.system_status.get("recognition_metric")
+            recognition_variant = self.system_status.get("recognition_variant")
             analysis_state = str(self.system_status.get("analysis_state", "idle"))
         return {
             "ok": ok,
@@ -406,6 +408,7 @@ class AccessService:
             "primary_face_bbox": primary_face_bbox,
             "recognition_score": recognition_score,
             "recognition_metric": recognition_metric,
+            "recognition_variant": recognition_variant,
         }
 
     def analyze_once(self) -> tuple[dict[str, Any], int]:
@@ -475,6 +478,8 @@ class AccessService:
                 ts = int(time.time())
                 with self.lock:
                     self.system_status["model"] = "not_loaded"
+                    self.system_status["recognition_score"] = None
+                    self.system_status["recognition_variant"] = None
                     self.system_status["analysis_state"] = "error"
                 payload = self._build_analysis_payload(
                     ok=False,
@@ -495,6 +500,8 @@ class AccessService:
                 if not loaded:
                     ts = int(time.time())
                     with self.lock:
+                        self.system_status["recognition_score"] = None
+                        self.system_status["recognition_variant"] = None
                         self.system_status["analysis_state"] = "error"
                     payload = self._build_analysis_payload(
                         ok=False,
@@ -517,6 +524,7 @@ class AccessService:
                     self.system_status["faces_count"] = 0
                     self.system_status["primary_face_bbox"] = None
                     self.system_status["recognition_score"] = None
+                    self.system_status["recognition_variant"] = None
                     self.system_status["face_updated_ts"] = ts
                     self.system_status["analysis_state"] = "error"
                 payload = self._build_analysis_payload(
@@ -545,6 +553,7 @@ class AccessService:
                     self.system_status["last_user"] = "-"
                     self.system_status["last_result"] = "MULTIPLE_FACES"
                     self.system_status["recognition_score"] = None
+                    self.system_status["recognition_variant"] = None
                     self.system_status["timestamp"] = ts
                     self.system_status["analysis_state"] = "error"
                 payload = self._build_analysis_payload(
@@ -565,6 +574,7 @@ class AccessService:
                 ts = int(time.time())
                 with self.lock:
                     self.system_status["recognition_score"] = None
+                    self.system_status["recognition_variant"] = None
                     self.system_status["face_updated_ts"] = ts
                     self.system_status["analysis_state"] = "error"
                 payload = self._build_analysis_payload(
@@ -599,6 +609,7 @@ class AccessService:
                 self.system_status["last_confidence"] = score
                 self.system_status["recognition_score"] = score
                 self.system_status["recognition_metric"] = self.recognizer.recognition_metric
+                self.system_status["recognition_variant"] = getattr(self.recognizer, "last_match_variant", None)
                 self.system_status["timestamp"] = ts
                 self.system_status["avg_recognition_ms"] = round(avg_ms, 2)
                 self.system_status["failed_attempts_consecutive"] = self.consecutive_denied
@@ -692,11 +703,7 @@ class AccessService:
         session = self.enrollment_session
         if session is None:
             return self._build_idle_enrollment_status()
-        status = session.get_status()
-        if status["state"] == "completed" and not session.samples_persisted:
-            self._persist_completed_enrollment(session)
-            status = session.get_status()
-        return status
+        return session.get_status()
 
     def abort_enrollment(self) -> dict[str, Any]:
         with self.enrollment_lock:
@@ -707,7 +714,7 @@ class AccessService:
                     "ok": False,
                     "error": "no_active_session",
                 }
-            should_cleanup_files = session.state != "completed" and not session.samples_persisted
+            should_cleanup_files = not session.samples_persisted
             if should_cleanup_files:
                 session.abort()
                 session.clear_all_files()
@@ -771,10 +778,11 @@ class AccessService:
             if self.enrollment_session is not session or session.samples_persisted:
                 return
             try:
-                db.insert_samples_with_pose(
+                db.replace_user_face_samples(
                     session.user_id,
                     session.all_sample_paths,
                     preprocess_mode=config.sface_preprocess_mode,
+                    dataset_dir=config.dataset_dir,
                 )
             except Exception:
                 logger.exception("enrollment_db_insert_failed user_id=%s", session.user_id)
@@ -800,6 +808,7 @@ class AccessService:
                 self.system_status["last_result"] = "MUESTRAS_PURGADAS"
                 self.system_status["last_confidence"] = None
                 self.system_status["recognition_score"] = None
+                self.system_status["recognition_variant"] = None
                 self.system_status["timestamp"] = int(time.time())
             return result
 
@@ -809,6 +818,7 @@ class AccessService:
                 "name": step["name"],
                 "label": step["label"],
                 "icon": step["icon"],
+                "appearance_variant": step.get("appearance_variant", "normal"),
                 "status": "pending",
                 "samples": 0,
                 "needed": config.enrollment_samples_per_step,
@@ -826,6 +836,7 @@ class AccessService:
             "step_name": None,
             "step_label": None,
             "step_icon": None,
+            "appearance_variant": None,
             "samples_this_step": 0,
             "samples_needed": config.enrollment_samples_per_step,
             "total_captured": 0,
@@ -889,6 +900,7 @@ class AccessService:
                 self.system_status["faces_count"] = 0
                 self.system_status["primary_face_bbox"] = None
                 self.system_status["recognition_score"] = None
+                self.system_status["recognition_variant"] = None
             logger.info("backend_sleep_enabled camera_kept_running=true camera_active=%s", cam_active)
             return {"ok": True, "sleep_mode": True}
 
@@ -982,6 +994,7 @@ class AccessService:
             self.system_status["last_confidence"] = confidence_value
             self.system_status["recognition_score"] = confidence_value
             self.system_status["recognition_metric"] = self.recognizer.recognition_metric
+            self.system_status["recognition_variant"] = None
             self.system_status["timestamp"] = int(time.time())
             self.system_status["failed_attempts_consecutive"] = self.consecutive_denied
             self.system_status["attempts_processed"] = self.attempts_processed

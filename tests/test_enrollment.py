@@ -45,7 +45,13 @@ def test_enrollment_session_starts_with_rehydratable_snapshot(tmp_path, monkeypa
     assert status["user_name"] == "Ana Prueba"
     assert status["current_step"] == 0
     assert status["total_steps"] == len(ENROLLMENT_STEPS)
-    assert status["guidance"]["instruction"] == "Mira de frente"
+    assert status["guidance"]["instruction"] == "Rostro normal"
+    assert status["appearance_variant"] == "normal"
+    assert [step["appearance_variant"] for step in status["steps_summary"]] == [
+        "normal",
+        "cabello_recogido",
+        "casco",
+    ]
     assert status["actions"]["can_abort"] is True
     assert status["actions"]["can_train"] is False
 

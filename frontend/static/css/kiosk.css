@@ -672,6 +672,86 @@ html.desktop-launch-pending .kiosk-camera__feed {
   border-color: rgba(251, 113, 133, 0.95);
 }
 
+.face-depth-field {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.96;
+  filter: drop-shadow(0 0 24px rgba(37, 99, 235, 0.48));
+  transition: opacity 160ms ease, filter 180ms ease;
+}
+
+.face-depth-field.is-hidden {
+  opacity: 0;
+}
+
+.face-depth-field__shell,
+.face-depth-field__shell::before,
+.face-depth-field__shell::after,
+.face-depth-field__sweep {
+  position: absolute;
+  content: "";
+  border-radius: 50%;
+}
+
+.face-depth-field__shell {
+  inset: 2%;
+  border: 2px solid rgba(147, 197, 253, 0.72);
+  box-shadow:
+    0 0 34px rgba(37, 99, 235, 0.52),
+    inset 0 0 42px rgba(59, 130, 246, 0.20);
+  animation: depthFieldBreathe 2.4s ease-in-out infinite;
+}
+
+.face-depth-field__shell::before {
+  inset: 12%;
+  border: 1px solid rgba(191, 219, 254, 0.42);
+}
+
+.face-depth-field__shell::after {
+  inset: 26%;
+  border: 1px solid rgba(96, 165, 250, 0.34);
+}
+
+.face-depth-field__line {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(191, 219, 254, 0.62), transparent);
+  transform-origin: center;
+}
+
+.face-depth-field__line:nth-of-type(2) { transform: rotate(30deg); }
+.face-depth-field__line:nth-of-type(3) { transform: rotate(60deg); }
+.face-depth-field__line:nth-of-type(4) { transform: rotate(90deg); }
+.face-depth-field__line:nth-of-type(5) { transform: rotate(120deg); }
+.face-depth-field__line:nth-of-type(6) { transform: rotate(150deg); }
+.face-depth-field__line:nth-of-type(7) { transform: rotate(0deg); }
+
+.face-depth-field__sweep {
+  inset: 0;
+  background: conic-gradient(from 0deg, rgba(219, 234, 254, 0.36), rgba(96, 165, 250, 0.20) 16%, transparent 32%, transparent 100%);
+  mix-blend-mode: screen;
+  animation: depthFieldSweep 2s linear infinite;
+}
+
+.face-depth-field.is-granted {
+  filter: drop-shadow(0 0 30px rgba(147, 197, 253, 0.68));
+}
+
+.face-depth-field.is-warning,
+.face-depth-field.is-denied {
+  filter: drop-shadow(0 0 28px rgba(96, 165, 250, 0.62));
+}
+
+.face-depth-field.is-warning .face-depth-field__shell,
+.face-depth-field.is-denied .face-depth-field__shell {
+  border-color: rgba(219, 234, 254, 0.82);
+}
+
 .welcome-overlay {
   position: absolute;
   inset: 0;
@@ -1246,6 +1326,23 @@ html.theme-light .user-photo {
 @keyframes guidePulseReady {
   0%, 100% { opacity: 0.88; }
   50% { opacity: 0.95; }
+}
+
+@keyframes depthFieldBreathe {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.055);
+    filter: brightness(1.16);
+  }
+}
+
+@keyframes depthFieldSweep {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes tipFadeIn {

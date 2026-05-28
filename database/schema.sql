@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS muestras (
     imagen_ref TEXT NOT NULL,
     pose_type TEXT NOT NULL DEFAULT 'frontal',
     preprocess_mode TEXT NOT NULL DEFAULT 'legacy_bbox',
+    appearance_variant TEXT NOT NULL DEFAULT 'normal',
     fecha_captura DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
@@ -93,6 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_accesos_usuario ON accesos(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_muestras_usuario ON muestras(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_muestras_pose ON muestras(pose_type);
 CREATE INDEX IF NOT EXISTS idx_muestras_preprocess ON muestras(preprocess_mode);
+CREATE INDEX IF NOT EXISTS idx_muestras_appearance ON muestras(appearance_variant);
 
 -- =========================
 -- 7. Vista de auditoría administrativa

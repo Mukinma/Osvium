@@ -64,7 +64,7 @@ function createDom(getStatus) {
                 <div id="faceArrowDown"></div>
               </div>
               <div id="faceBoxOverlay">
-                <div id="primaryFaceBox" class="face-box is-hidden"></div>
+                <div id="primaryFaceBox" class="face-depth-field is-hidden"></div>
               </div>
               <div id="welcomeOverlay" class="welcome-overlay is-hidden">
                 <svg id="welcomeCheckIcon" class="welcome-overlay__icon" aria-hidden="true">
@@ -261,7 +261,7 @@ describe('kiosk recognition UI', () => {
     expect(dom.window.document.getElementById('accessReceiptIcon').classList.contains('is-hidden')).toBe(false);
   });
 
-  it('positions the dynamic face box from primary_face_bbox', async () => {
+  it('renders a square blue depth field from primary_face_bbox instead of a rectangle', async () => {
     vi.useFakeTimers();
     const dom = createDom(() => baseStatus({
       face_detected: true,
@@ -273,9 +273,12 @@ describe('kiosk recognition UI', () => {
 
     const box = dom.window.document.getElementById('primaryFaceBox');
     expect(box.classList.contains('is-hidden')).toBe(false);
-    expect(box.style.left).toBe('10%');
-    expect(box.style.top).toBe('20%');
-    expect(box.style.width).toBe('30%');
-    expect(box.style.height).toBe('40%');
+    expect(box.classList.contains('face-depth-field')).toBe(true);
+    expect(box.classList.contains('face-box')).toBe(false);
+    expect(box.querySelector('.face-depth-field__sweep')).not.toBeNull();
+    expect(box.querySelectorAll('.face-depth-field__line')).toHaveLength(6);
+    expect(box.style.width).toBe(box.style.height);
+    expect(box.style.top).toBe('7%');
+    expect(box.style.width).toBe('53%');
   });
 });

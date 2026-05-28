@@ -17,6 +17,7 @@ ACCESS_RESULTS_ALLOWED = {
     "MANUAL",
     "DENEGADO_BLOQUEO",
 }
+APPEARANCE_VARIANTS_ALLOWED = {"normal", "cabello_recogido", "casco"}
 
 
 class Database:
@@ -108,6 +109,14 @@ class Database:
                         sql_to_execute,
                         flags=re.IGNORECASE,
                     )
+                has_appearance_before = "appearance_variant" in muestras_cols_before
+                if not has_appearance_before:
+                    sql_to_execute = re.sub(
+                        r"CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+idx_muestras_appearance\s+ON\s+muestras\s*\(\s*appearance_variant\s*\)\s*;",
+                        "",
+                        sql_to_execute,
+                        flags=re.IGNORECASE,
+                    )
 
                 configuracion_cols_before = {
                     row["name"]
@@ -138,12 +147,20 @@ class Database:
                         "ALTER TABLE muestras ADD COLUMN preprocess_mode TEXT NOT NULL DEFAULT 'legacy_bbox';"
                     )
                     logger.info("migration_applied added_column=preprocess_mode table=muestras")
+                if "appearance_variant" not in muestras_cols:
+                    conn.execute(
+                        "ALTER TABLE muestras ADD COLUMN appearance_variant TEXT NOT NULL DEFAULT 'normal';"
+                    )
+                    logger.info("migration_applied added_column=appearance_variant table=muestras")
 
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_muestras_pose ON muestras(pose_type);"
                 )
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_muestras_preprocess ON muestras(preprocess_mode);"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_muestras_appearance ON muestras(appearance_variant);"
                 )
 
                 configuracion_cols = {
@@ -377,45 +394,59 @@ class Database:
             raise ValueError("preprocess_mode inválido")
         return mode
 
+    def _normalize_appearance_variant(self, appearance_variant: Optional[str]) -> str:
+        variant = (appearance_variant or "normal").strip().lower()
+        if variant not in APPEARANCE_VARIANTS_ALLOWED:
+            raise ValueError("appearance_variant inválido")
+        return variant
+
+    @staticmethod
+    def _normalize_pose_type(pose_type: Optional[str]) -> str:
+        valid_poses = {"frontal", "tilt_left", "tilt_right", "look_up", "look_down", "turn_left", "turn_right", "center"}
+        pose = pose_type.strip().lower() if pose_type else "frontal"
+        return pose if pose in valid_poses else "frontal"
+
     def insert_sample_with_pose(
         self,
         user_id: int,
         imagen_ref: str,
         pose_type: str,
         preprocess_mode: Optional[str] = None,
+        appearance_variant: Optional[str] = None,
     ) -> int:
         if int(user_id) <= 0:
             raise ValueError("user_id inválido")
         imagen_ref_norm = self._normalize_imagen_ref(imagen_ref)
-        valid_poses = {"frontal", "tilt_left", "tilt_right", "look_up", "look_down", "turn_left", "turn_right", "center"}
-        pose = pose_type.strip().lower() if pose_type else "frontal"
-        if pose not in valid_poses:
-            pose = "frontal"
+        pose = self._normalize_pose_type(pose_type)
         mode = self._normalize_preprocess_mode(preprocess_mode)
+        variant = self._normalize_appearance_variant(appearance_variant)
         return self.execute(
-            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type, preprocess_mode) VALUES (?, ?, ?, ?)",
-            (int(user_id), imagen_ref_norm, pose, mode),
+            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type, preprocess_mode, appearance_variant) VALUES (?, ?, ?, ?, ?)",
+            (int(user_id), imagen_ref_norm, pose, mode, variant),
         )
 
     def insert_samples_with_pose(
         self,
         user_id: int,
-        samples: Iterable[tuple[str, str]],
+        samples: Iterable[tuple],
         preprocess_mode: Optional[str] = None,
     ) -> int:
         if int(user_id) <= 0:
             raise ValueError("user_id inválido")
-        valid_poses = {"frontal", "tilt_left", "tilt_right", "look_up", "look_down", "turn_left", "turn_right", "center"}
         mode = self._normalize_preprocess_mode(preprocess_mode)
         rows = []
-        for imagen_ref, pose_type in samples:
+        for sample in samples:
+            if len(sample) == 2:
+                imagen_ref, pose_type = sample
+                appearance_variant = "normal"
+            else:
+                imagen_ref, pose_type, appearance_variant = sample[:3]
             imagen_ref_norm = self._normalize_imagen_ref(imagen_ref)
-            pose = pose_type.strip().lower() if pose_type else "frontal"
-            if pose not in valid_poses:
-                pose = "frontal"
-            rows.append((int(user_id), imagen_ref_norm, pose, mode))
+            pose = self._normalize_pose_type(pose_type)
+            variant = self._normalize_appearance_variant(appearance_variant)
+            rows.append((int(user_id), imagen_ref_norm, pose, mode, variant))
         return self.execute_many(
-            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type, preprocess_mode) VALUES (?, ?, ?, ?)",
+            "INSERT INTO muestras (usuario_id, imagen_ref, pose_type, preprocess_mode, appearance_variant) VALUES (?, ?, ?, ?, ?)",
             rows,
         )
 
@@ -424,14 +455,16 @@ class Database:
         user_id: int,
         imagen_ref: str,
         preprocess_mode: Optional[str] = None,
+        appearance_variant: Optional[str] = None,
     ) -> int:
         if int(user_id) <= 0:
             raise ValueError("user_id inválido")
         imagen_ref_norm = self._normalize_imagen_ref(imagen_ref)
         mode = self._normalize_preprocess_mode(preprocess_mode)
+        variant = self._normalize_appearance_variant(appearance_variant)
         return self.execute(
-            "INSERT INTO muestras (usuario_id, imagen_ref, preprocess_mode) VALUES (?, ?, ?)",
-            (int(user_id), imagen_ref_norm, mode),
+            "INSERT INTO muestras (usuario_id, imagen_ref, preprocess_mode, appearance_variant) VALUES (?, ?, ?, ?)",
+            (int(user_id), imagen_ref_norm, mode, variant),
         )
 
     def list_samples(
@@ -451,11 +484,81 @@ class Database:
             params.append(self._normalize_preprocess_mode(preprocess_mode))
         where = f" WHERE {' AND '.join(filters)}" if filters else ""
         query = (
-            "SELECT id, usuario_id, imagen_ref, pose_type, preprocess_mode, fecha_captura "
+            "SELECT id, usuario_id, imagen_ref, pose_type, preprocess_mode, appearance_variant, fecha_captura "
             f"FROM muestras{where} ORDER BY id DESC"
         )
         rows = self.fetch_all(query, tuple(params))
         return [dict(row) for row in rows]
+
+    def replace_user_face_samples(
+        self,
+        user_id: int,
+        samples: Iterable[tuple],
+        preprocess_mode: Optional[str] = None,
+        dataset_dir: str = config.dataset_dir,
+    ) -> dict[str, Any]:
+        if int(user_id) <= 0:
+            raise ValueError("user_id inválido")
+
+        mode = self._normalize_preprocess_mode(preprocess_mode)
+        rows = []
+        new_refs: set[str] = set()
+        for sample in samples:
+            if len(sample) == 2:
+                imagen_ref, pose_type = sample
+                appearance_variant = "normal"
+            else:
+                imagen_ref, pose_type, appearance_variant = sample[:3]
+            imagen_ref_norm = self._normalize_imagen_ref(imagen_ref)
+            pose = self._normalize_pose_type(pose_type)
+            variant = self._normalize_appearance_variant(appearance_variant)
+            rows.append((int(user_id), imagen_ref_norm, pose, mode, variant))
+            new_refs.add(imagen_ref_norm)
+
+        if not rows:
+            raise ValueError("samples vacío")
+
+        old_refs: list[str] = []
+        deleted_samples = 0
+        try:
+            with self.connect() as conn:
+                old_rows = conn.execute(
+                    "SELECT imagen_ref FROM muestras WHERE usuario_id=?",
+                    (int(user_id),),
+                ).fetchall()
+                old_refs = [str(row["imagen_ref"]) for row in old_rows]
+                cur = conn.execute("DELETE FROM muestras WHERE usuario_id=?", (int(user_id),))
+                deleted_samples = int(cur.rowcount if cur.rowcount is not None else 0)
+                conn.executemany(
+                    "INSERT INTO muestras (usuario_id, imagen_ref, pose_type, preprocess_mode, appearance_variant) VALUES (?, ?, ?, ?, ?)",
+                    rows,
+                )
+        except Exception:
+            logger.exception("db_replace_user_face_samples_failed user_id=%s", user_id)
+            raise
+
+        deleted_files = 0
+        root = Path(dataset_dir).resolve()
+        for ref in old_refs:
+            if ref in new_refs:
+                continue
+            path = Path(ref)
+            if not path.is_absolute():
+                path = root.parent / path
+            try:
+                resolved = path.resolve()
+                if root in resolved.parents and resolved.is_file():
+                    resolved.unlink()
+                    deleted_files += 1
+            except OSError:
+                logger.warning("replace_user_face_sample_file_failed path=%s", ref)
+
+        return {
+            "ok": True,
+            "deleted_samples": deleted_samples,
+            "inserted_samples": len(rows),
+            "deleted_files": deleted_files,
+        }
 
     def purge_face_samples(self, dataset_dir: str = config.dataset_dir, model_path: str = config.model_path) -> dict[str, Any]:
         rows = self.fetch_all("SELECT imagen_ref FROM muestras")
