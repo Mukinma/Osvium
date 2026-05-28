@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native desktop launcher for Vireom.
+"""Native desktop launcher for Osvium.
 
 Starts the local FastAPI app on 127.0.0.1 and wraps it in a pywebview window
 without requiring the user to type localhost in a browser.
@@ -25,6 +25,7 @@ import uvicorn
 
 logger = logging.getLogger("camerapi.desktop")
 
+DESKTOP_GUI_BACKEND = "qt"
 DESKTOP_READY_EVENT = "vireom:desktop-ready"
 DESKTOP_LAUNCH_QUERY = "desktop-launch=1"
 DESKTOP_WINDOW_SETTLE_S = 0.35
@@ -49,7 +50,7 @@ class DesktopLauncherConfig:
     fullscreen: bool = True
     health_timeout_s: float = 25.0
     health_interval_s: float = 0.25
-    title: str = "Vireom"
+    title: str = "Osvium"
 
     @property
     def base_url(self) -> str:
@@ -89,7 +90,7 @@ class DesktopWindowState:
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Launch Vireom in a native desktop window.")
+    parser = argparse.ArgumentParser(description="Launch Osvium in a native desktop window.")
     parser.add_argument("--host", default="127.0.0.1", help="Local bind host for desktop mode.")
     parser.add_argument("--port", default=8000, type=int, help="Local bind port for desktop mode.")
     parser.add_argument("--width", default=1280, type=int, help="Initial window width.")
@@ -123,7 +124,7 @@ def assert_port_available(host: str, port: int) -> None:
         probe.settimeout(0.5)
         if probe.connect_ex((host, port)) == 0:
             raise RuntimeError(
-                f"El puerto local {port} ya esta en uso. Cierra la otra instancia de Vireom o libera ese puerto."
+                f"El puerto local {port} ya esta en uso. Cierra la otra instancia de Osvium o libera ese puerto."
             )
 
 
@@ -143,7 +144,7 @@ def create_server_handle(config: DesktopLauncherConfig) -> DesktopServerHandle:
 
     app = get_app()
     server = uvicorn.Server(_build_server_config(app, config))
-    thread = threading.Thread(target=server.run, name="vireom-desktop-server", daemon=True)
+    thread = threading.Thread(target=server.run, name="osvium-desktop-server", daemon=True)
     return DesktopServerHandle(server=server, thread=thread, base_url=config.base_url)
 
 
@@ -288,16 +289,16 @@ def open_desktop_window(config: DesktopLauncherConfig) -> None:
         )
         state = DesktopWindowState()
         _bind_window_event_handlers(window, state, config)
-        webview.start(debug=False)
+        webview.start(debug=False, gui=DESKTOP_GUI_BACKEND)
     except Exception as exc:
         linux_hint = ""
         if platform.system().lower() == "linux":
             linux_hint = (
-                " Verifica que Raspberry OS/Linux tenga instalado un backend compatible de "
-                "GTK/WebKit2GTK o Qt para pywebview."
+                " Verifica que Raspberry OS/Linux tenga instalado Qt y las dependencias de "
+                "pywebview para el backend qt (qtpy, PyQt6, PyQt6-WebEngine)."
             )
         raise RuntimeError(
-            f"No se pudo abrir la ventana nativa de Vireom.{linux_hint}"
+            f"No se pudo abrir la ventana nativa de Osvium.{linux_hint}"
         ) from exc
 
 
@@ -324,7 +325,7 @@ def run_launcher(config: DesktopLauncherConfig) -> int:
         return 130
     except Exception as exc:
         logger.error("desktop_launcher_failed error=%s", exc)
-        print(f"[Vireom desktop] {exc}", file=sys.stderr)
+        print(f"[Osvium desktop] {exc}", file=sys.stderr)
         return 1
     finally:
         if handle is not None:

@@ -1,0 +1,217 @@
+/* ── On-screen keyboard ─────────────────────────────────────────────────────
+   Dark-first, built on Osvium design tokens from styles.css.
+   Light overrides use html.theme-light prefix (same pattern as the app).
+   z-index 1200 > passwordSheet (800) > adminDialog (90).
+   ──────────────────────────────────────────────────────────────────────── */
+
+.osk-panel {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 1200;
+  padding: 8px 8px 14px;
+  background: var(--bg-surface);
+  border-top: 1px solid rgba(var(--primary-rgb), 0.18);
+  box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.38);
+  font-family: var(--font-family);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transform: translateY(100%);
+  transition: transform 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.osk-panel.osk-visible {
+  transform: translateY(0);
+}
+
+/* ── Rows ── */
+
+.osk-row {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+.osk-row:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Keys ── */
+
+.osk-key {
+  min-height: 46px;
+  min-width: 28px;
+  padding: 0 4px;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--primary-rgb), 0.16);
+  border-radius: 10px;
+  background: rgba(var(--primary-rgb), 0.09);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow:
+    -2px -2px 5px var(--neu-highlight),
+    3px 3px 7px var(--neu-shadow);
+  transition:
+    background var(--ease-fast),
+    box-shadow var(--ease-fast),
+    transform 80ms ease;
+}
+
+.osk-key:active {
+  transform: scale(0.91);
+  background: rgba(var(--accent-rgb), 0.22);
+  box-shadow: none;
+}
+
+/* Action keys (Shift, ?123, ABC) */
+.osk-key--action {
+  flex: 1.5;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+/* Space bar */
+.osk-key--space {
+  flex: 5;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+/* Enter key */
+.osk-key--enter {
+  flex: 2;
+  background: linear-gradient(
+    145deg,
+    rgba(var(--accent-rgb), 0.72),
+    rgba(var(--primary-rgb), 0.78)
+  );
+  color: var(--text-on-primary);
+  border-color: rgba(var(--primary-rgb), 0.3);
+  font-size: 1.15rem;
+}
+
+.osk-key--enter:active {
+  background: rgba(var(--accent-rgb), 0.55);
+}
+
+/* Backspace key */
+.osk-key--backspace {
+  flex: 1.5;
+}
+
+/* Shift — active state */
+.osk-key--shift.is-active {
+  background: rgba(var(--accent-rgb), 0.24);
+  border-color: rgba(var(--accent-rgb), 0.38);
+  color: var(--text-primary);
+}
+
+/* ── Numeric pad ── */
+
+.osk-numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.osk-numpad .osk-key {
+  min-height: 52px;
+  font-size: 1.25rem;
+}
+
+.osk-numpad .osk-key--enter {
+  grid-column: span 3;
+  font-size: 1.1rem;
+}
+
+/* ── Body state when keyboard is open ── */
+
+body.kb-open {
+  --kb-height: 260px;
+}
+
+/* ── Light theme overrides ── */
+
+html.theme-light .osk-panel {
+  border-top-color: var(--border-soft);
+  box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.11);
+}
+
+html.theme-light .osk-key {
+  background: rgba(var(--primary-rgb), 0.06);
+  border-color: rgba(var(--primary-rgb), 0.2);
+}
+
+html.theme-light .osk-key:active {
+  background: rgba(var(--primary-rgb), 0.18);
+}
+
+html.theme-light .osk-key--action {
+  background: rgba(var(--primary-rgb), 0.04);
+}
+
+html.theme-light .osk-key--enter {
+  background: linear-gradient(
+    145deg,
+    rgba(var(--accent-rgb), 0.85),
+    rgba(var(--primary-rgb), 0.9)
+  );
+}
+
+/* ── Toggle switch (used in admin settings row) ── */
+
+.osk-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  margin-left: auto;
+  pointer-events: none; /* parent row handles click */
+}
+
+.osk-switch__track {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 13px;
+  background: rgba(var(--primary-rgb), 0.18);
+  border: 1px solid rgba(var(--primary-rgb), 0.28);
+  transition: background var(--ease-fast), border-color var(--ease-fast);
+}
+
+.osk-switch__thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform var(--ease-fast), background var(--ease-fast);
+}
+
+[aria-checked="true"] .osk-switch__track {
+  background: rgba(var(--accent-rgb), 0.52);
+  border-color: rgba(var(--accent-rgb), 0.68);
+}
+
+[aria-checked="true"] .osk-switch__thumb {
+  transform: translateX(18px);
+  background: #f0faff;
+}

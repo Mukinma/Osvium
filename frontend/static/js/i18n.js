@@ -254,6 +254,7 @@
     'Mantenimiento': 'Maintenance',
     'Traductor': 'Translator',
     'Cambiar idioma del sistema': 'Change system language',
+    'Teclado en pantalla': 'On-screen keyboard',
     'Sistema y cuenta': 'System and account',
     'Cuenta': 'Account',
     'Acerca de': 'About',

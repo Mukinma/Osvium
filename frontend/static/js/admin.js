@@ -1636,6 +1636,24 @@ passwordSheetConfirm?.addEventListener('click', async () => {
 const translatorRow = document.getElementById('translatorRow');
 const translatorPill = document.getElementById('translatorPill');
 
+/* ── Settings: On-screen keyboard toggle ── */
+
+const onscreenKbRow = document.getElementById('onscreenKbRow');
+
+function refreshOskSwitch() {
+  if (!onscreenKbRow) return;
+  const on = window.OsviumKeyboard?.isEnabled() ?? true;
+  onscreenKbRow.setAttribute('aria-checked', on ? 'true' : 'false');
+}
+
+onscreenKbRow?.addEventListener('click', () => {
+  const current = window.OsviumKeyboard?.isEnabled() ?? true;
+  window.OsviumKeyboard?.setEnabled(!current);
+  refreshOskSwitch();
+});
+
+refreshOskSwitch();
+
 function getCurrentLang() {
   try {
     if (window.i18n && typeof window.i18n.getLang === 'function') {

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/static/css/styles.css?v={{ asset_version }}" />
   <link rel="stylesheet" href="/static/css/admin.css?v={{ asset_version }}" />
   <link rel="stylesheet" href="/static/css/enrollment.css?v={{ asset_version }}" />
+  <link rel="stylesheet" href="/static/css/keyboard.css?v={{ asset_version }}" />
   <link rel="stylesheet" href="/static/css/i18n.css?v={{ asset_version }}" />
   <script>
     /* Admin is always dark — no theme toggle */
@@ -371,6 +372,24 @@
               <span class="admin-lang-pill__opt" data-lang="en">EN</span>
             </span>
           </button>
+          <div class="settings-row-divider"></div>
+          <!-- Teclado en pantalla: activa/desactiva el OSK táctil (reemplaza al teclado del SO) -->
+          <button class="settings-row" type="button" id="onscreenKbRow"
+                  role="switch" aria-checked="true"
+                  aria-label="Teclado en pantalla"
+                  data-i18n-attr="aria-label:Teclado en pantalla">
+            <div class="settings-row__icon-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="6" width="20" height="12" rx="2"/>
+                <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>
+              </svg>
+            </div>
+            <span class="settings-row__label" data-i18n>Teclado en pantalla</span>
+            <span class="osk-switch" aria-hidden="true">
+              <span class="osk-switch__track"></span>
+              <span class="osk-switch__thumb"></span>
+            </span>
+          </button>
         </div>
 
         <!-- Grupo 3: Sistema y cuenta -->
@@ -725,6 +744,7 @@
 
   <script src="/static/js/i18n.js?v={{ asset_version }}"></script>
   <script src="/static/js/theme.js?v={{ asset_version }}"></script>
+  <script src="/static/js/onscreen-keyboard.js?v={{ asset_version }}"></script>
   <script src="/static/js/logo-navigation.js?v={{ asset_version }}"></script>
   <script src="/static/js/admin-layout.js?v={{ asset_version }}"></script>
   <script src="/static/js/enrollment-fsm.js?v={{ asset_version }}"></script>
