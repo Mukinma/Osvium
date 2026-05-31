@@ -1,5 +1,12 @@
 .kiosk-body {
   overflow: hidden;
+  /* Kiosco: evita el zoom por doble-tap y la selección de texto al
+     tocar/click rápido. */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .kiosk-shell {
@@ -788,6 +795,14 @@ html.desktop-launch-pending .kiosk-camera__feed {
   background:
     linear-gradient(180deg, rgba(37, 99, 235, 0.86), rgba(14, 116, 144, 0.74)),
     rgba(29, 78, 216, 0.74);
+}
+
+/* Contraparte de acceso denegado — misma transparencia y estructura que el
+   azul, pero en paleta roja. */
+.welcome-overlay--red {
+  background:
+    linear-gradient(180deg, rgba(220, 38, 38, 0.86), rgba(153, 27, 27, 0.74)),
+    rgba(185, 28, 28, 0.74);
 }
 
 .welcome-overlay span {
@@ -1635,4 +1650,112 @@ html.theme-light .user-photo {
   .lockscreen__hint {
     font-size: clamp(1rem, 4vw, 1.28rem);
   }
+}
+
+/* ──────────────────────────────────────────────
+   Bloqueo por exceso de taps/clicks
+   Pop-up gris modal con cuenta regresiva. No se puede cerrar
+   manualmente; el fondo se difumina mientras está activo.
+   ────────────────────────────────────────────── */
+.tap-lockout {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tap-lockout.is-hidden {
+  display: none;
+}
+
+.tap-lockout__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 18, 24, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.tap-lockout__panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(90vw, 420px);
+  padding: 34px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(63, 68, 78, 0.97), rgba(40, 44, 52, 0.97));
+  color: #f4f5f7;
+  text-align: center;
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.48);
+  animation: tap-lockout-pop 220ms ease;
+}
+
+@keyframes tap-lockout-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.tap-lockout__icon {
+  width: 56px;
+  height: 56px;
+  color: #d9dbe0;
+}
+
+.tap-lockout__title {
+  margin: 0;
+  font-size: 1.38rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.tap-lockout__message {
+  margin: 0;
+  font-size: 1.04rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(244, 245, 247, 0.86);
+}
+
+.tap-lockout__count {
+  font-weight: 800;
+  color: #fff;
+}
+
+.tap-lockout__bar {
+  width: 100%;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.tap-lockout__bar-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(216, 218, 224, 0.92);
+  transition: width 1s linear;
+}
+
+/* El botón del traductor vive por encima del overlay (z-index alto), así que
+   el backdrop-filter no lo alcanza: lo difuminamos y deshabilitamos a mano
+   mientras dura el bloqueo, para que también quede fuera de foco. */
+.tap-lockout-open .i18n-toggle {
+  filter: blur(6px);
+  pointer-events: none;
+  transition: filter 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tap-lockout__panel { animation: none; }
+  .tap-lockout__bar-fill { transition: none; }
+  .tap-lockout-open .i18n-toggle { transition: none; }
 }

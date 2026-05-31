@@ -52,6 +52,16 @@
     'Sube ligeramente la cabeza': 'Raise your head slightly',
     'Ajusta tu posición': 'Adjust your position',
 
+    /* Overlay de reconocimiento (pantalla azul / roja) */
+    'Adelante': 'Proceed',
+    'No autorizado': 'Not authorized',
+    'Persona no registrada': 'Unregistered person',
+
+    /* Bloqueo por exceso de taps/clicks */
+    'Oops, demasiados intentos': 'Oops, too many attempts',
+    'Podrás acceder nuevamente en {s} segundos':
+      "You'll be able to access again in {s} seconds",
+
     /* Toast — main */
     'Acceso concedido': 'Access granted',
     'Acceso denegado': 'Access denied',
