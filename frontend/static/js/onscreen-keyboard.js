@@ -269,7 +269,7 @@
     /* Prevent any pointer interaction from moving focus away from the active input */
     panel.addEventListener('pointerdown', (e) => e.preventDefault());
     panel.addEventListener('mousedown', (e) => e.preventDefault());
-    panel.addEventListener('click', handleClick);
+    panel.addEventListener('pointerup', handleClick);
     document.body.appendChild(panel);
   }
 

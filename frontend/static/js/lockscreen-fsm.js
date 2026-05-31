@@ -28,6 +28,7 @@ export const EFFECTS = {
   CLEAR_WAKE_TIMEOUT: 'CLEAR_WAKE_TIMEOUT',
   CONSUME_LOCKSCREEN_INPUT: 'CONSUME_LOCKSCREEN_INPUT',
   LOG_IGNORED_EVENT: 'LOG_IGNORED_EVENT',
+  FORCE_UNLOCK_CAMERA_ERROR: 'FORCE_UNLOCK_CAMERA_ERROR',
 };
 
 export function createInitialContext() {
@@ -35,6 +36,7 @@ export function createInitialContext() {
     state: STATES.LOCKSCREEN_VISIBLE,
     sleepReason: 'boot',
     wakeAttemptId: 0,
+    consecutiveResumeFails: 0,
     stateEnteredAt: Date.now(),
     effects: [EFFECTS.SCHEDULE_ENTER_SLEEP],
   };
@@ -60,13 +62,13 @@ export function transition(context, event) {
   if (ctx.state === STATES.ACTIVE_UNLOCKED) {
     if (type === EVENTS.IDLE_TIMEOUT_45S) {
       return withEffects(
-        { ...ctx, state: STATES.LOCKSCREEN_VISIBLE, sleepReason: 'idle', stateEnteredAt: now },
+        { ...ctx, state: STATES.LOCKSCREEN_VISIBLE, sleepReason: 'idle', consecutiveResumeFails: 0, stateEnteredAt: now },
         [EFFECTS.SHOW_LOCKSCREEN, EFFECTS.SCHEDULE_ENTER_SLEEP],
       );
     }
     if (type === EVENTS.DEBUG_SHORTCUT) {
       return withEffects(
-        { ...ctx, state: STATES.LOCKSCREEN_VISIBLE, sleepReason: 'debug', stateEnteredAt: now },
+        { ...ctx, state: STATES.LOCKSCREEN_VISIBLE, sleepReason: 'debug', consecutiveResumeFails: 0, stateEnteredAt: now },
         [EFFECTS.SHOW_LOCKSCREEN, EFFECTS.SCHEDULE_ENTER_SLEEP],
       );
     }
@@ -106,13 +108,20 @@ export function transition(context, event) {
     const sameAttempt = event.wakeAttemptId === ctx.wakeAttemptId;
     if (type === EVENTS.WAKE_READY && sameAttempt) {
       return withEffects(
-        { ...ctx, state: STATES.ACTIVE_UNLOCKED, stateEnteredAt: now },
+        { ...ctx, state: STATES.ACTIVE_UNLOCKED, consecutiveResumeFails: 0, stateEnteredAt: now },
         [EFFECTS.CLEAR_WAKE_TIMEOUT, EFFECTS.HIDE_LOCKSCREEN, EFFECTS.RESET_IDLE_DEADLINE],
       );
     }
     if (type === EVENTS.RESUME_FAIL && sameAttempt) {
+      const fails = ctx.consecutiveResumeFails + 1;
+      if (fails >= 2) {
+        return withEffects(
+          { ...ctx, state: STATES.ACTIVE_UNLOCKED, consecutiveResumeFails: 0, stateEnteredAt: now },
+          [EFFECTS.CLEAR_WAKE_TIMEOUT, EFFECTS.FORCE_UNLOCK_CAMERA_ERROR, EFFECTS.RESET_IDLE_DEADLINE],
+        );
+      }
       return withEffects(
-        { ...ctx, state: STATES.SLEEP_FORCED, stateEnteredAt: now },
+        { ...ctx, state: STATES.SLEEP_FORCED, consecutiveResumeFails: fails, stateEnteredAt: now },
         [EFFECTS.CLEAR_WAKE_TIMEOUT, EFFECTS.SHOW_LOCKSCREEN, EFFECTS.PAUSE_CAMERA, EFFECTS.PAUSE_SCAN, EFFECTS.PAUSE_POLLING],
       );
     }

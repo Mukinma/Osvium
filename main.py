@@ -20,7 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from api.routes import router
 from config import config
 from database.db import db
-from hardware.gpio_control import RelayController
+from hardware.gpio_control import ServoController
 from rate_limit import limiter
 from vision.camera import CameraStream
 from vision.detector import FaceDetection, YuNetFaceDetector
@@ -41,7 +41,7 @@ class AccessService:
         self.detector = YuNetFaceDetector()
         self.recognizer = SFaceRecognizer()
         self.trainer = FaceTrainer(self.recognizer)
-        self.relay = RelayController(pin=18, active_high=True)
+        self.relay = ServoController()
         self.guidance = FaceGuidanceEngine()
         self.pose_heuristic = PoseHeuristic()
         self.enrollment_session: Optional[EnrollmentSession] = None

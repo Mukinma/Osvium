@@ -329,9 +329,10 @@ function formatLogMoment(raw) {
     && date.getDate() === now.getDate()
   );
 
+  const locale = window.i18n?.getLang() === 'en' ? 'en-US' : 'es-MX';
   return sameDay
-    ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(date)
-    : new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
+    ? new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)
+    : new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
 function formatPercent(value) {
