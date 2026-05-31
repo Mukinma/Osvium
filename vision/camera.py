@@ -15,8 +15,10 @@ try:
     from picamera2 import Picamera2
 
     _HAS_PICAMERA2 = True
-except ImportError:
+    _PICAMERA2_IMPORT_ERROR: Optional[str] = None
+except ImportError as _exc:
     _HAS_PICAMERA2 = False
+    _PICAMERA2_IMPORT_ERROR: Optional[str] = str(_exc)
 
 
 class CameraStream:
@@ -44,11 +46,15 @@ class CameraStream:
         # Picamera2 backend
         self._picam: Optional["Picamera2"] = None
         self._picam_started = False
+        self._consecutive_read_failures = 0
 
         if self._use_picamera2:
             logger.info("camera_backend=picamera2")
         else:
-            logger.info("camera_backend=opencv")
+            if _PICAMERA2_IMPORT_ERROR:
+                logger.info("camera_backend=opencv picamera2_unavailable reason=%s", _PICAMERA2_IMPORT_ERROR)
+            else:
+                logger.info("camera_backend=opencv")
         logger.info("camera_orientation flip_horizontal=%s", config.camera_flip_horizontal)
 
     # ── Picamera2 backend ────────────────────────────────────────────
@@ -71,29 +77,59 @@ class CameraStream:
                 key = next(iter(control.keys()))
                 logger.debug("picamera2_control_unsupported control=%s", key)
 
+    @staticmethod
+    def _select_full_fov_raw_size(picam: "Picamera2") -> Optional[tuple]:
+        """Return the smallest sensor mode that covers the full sensor FOV.
+
+        Modes with crop_limits starting at (0, 0) use the entire sensor area,
+        avoiding the centre-crop zoom effect that lower-resolution modes produce.
+        """
+        try:
+            modes = picam.sensor_modes
+            full_fov = [
+                m for m in modes
+                if len(m.get("crop_limits", ())) >= 2
+                and m["crop_limits"][0] == 0
+                and m["crop_limits"][1] == 0
+            ]
+            if full_fov:
+                return min(full_fov, key=lambda m: m["size"][0] * m["size"][1])["size"]
+        except Exception:
+            pass
+        return None
+
     def _open_picamera2(self) -> bool:
         for attempt in range(1, self.max_open_retries + 1):
             try:
                 self._release_picamera2()
                 picam = Picamera2()
+                raw_size = self._select_full_fov_raw_size(picam)
                 video_cfg = picam.create_video_configuration(
                     main={
                         "format": "BGR888",
                         "size": (config.frame_width, config.frame_height),
                     },
+                    **({"raw": {"size": raw_size}} if raw_size else {}),
                 )
                 picam.configure(video_cfg)
                 picam.start()
+                try:
+                    for _ in range(3):
+                        picam.capture_array("main")
+                        time.sleep(0.1)
+                except Exception:
+                    logger.debug("picamera2_warmup_skipped attempt=%s", attempt, exc_info=True)
                 self._configure_picamera2_controls(picam)
-                time.sleep(0.5)
+                time.sleep(1.0)
                 self._picam = picam
                 self._picam_started = True
                 logger.info(
-                    "picamera2_open_ok attempt=%s size=%sx%s fps=%s",
+                    "picamera2_open_ok attempt=%s size=%sx%s fps=%s full_fov_raw=%s",
                     attempt,
                     config.frame_width,
                     config.frame_height,
                     config.max_fps,
+                    raw_size,
                 )
                 return True
             except Exception:
@@ -124,7 +160,9 @@ class CameraStream:
             frame = np.ascontiguousarray(frame.copy())
             if len(frame.shape) == 3:
                 if frame.shape[2] == 4:
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+                elif frame.shape[2] == 3:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             return True, frame
         except Exception:
             logger.exception("picamera2_capture_failed")
@@ -135,6 +173,14 @@ class CameraStream:
     def _preferred_backends(self) -> list[tuple[str, Optional[int]]]:
         if sys.platform == "darwin" and hasattr(cv2, "CAP_AVFOUNDATION"):
             return [("AVFOUNDATION", int(cv2.CAP_AVFOUNDATION)), ("DEFAULT", None)]
+        if sys.platform.startswith("linux"):
+            backends: list[tuple[str, Optional[int]]] = []
+            if hasattr(cv2, "CAP_V4L2"):
+                backends.append(("V4L2", int(cv2.CAP_V4L2)))
+            if hasattr(cv2, "CAP_GSTREAMER"):
+                backends.append(("GSTREAMER", int(cv2.CAP_GSTREAMER)))
+            backends.append(("DEFAULT", None))
+            return backends
         return [("DEFAULT", None)]
 
     def _configure_capture(self, cap: cv2.VideoCapture) -> None:
@@ -160,6 +206,21 @@ class CameraStream:
         self._configure_capture(cap)
         return cap
 
+    def _warmup_opencv_capture(self, cap: cv2.VideoCapture, *, attempt: int, backend_name: str) -> None:
+        try:
+            for _ in range(3):
+                ok, _frame = cap.read()
+                if ok:
+                    break
+                time.sleep(0.1)
+        except Exception:
+            logger.debug(
+                "camera_warmup_skipped attempt=%s backend=%s",
+                attempt,
+                backend_name,
+                exc_info=True,
+            )
+
     def _open_opencv(self) -> bool:
         for attempt in range(1, self.max_open_retries + 1):
             for backend_name, backend in self._preferred_backends():
@@ -167,8 +228,10 @@ class CameraStream:
                 try:
                     cap = self._open_single(backend)
                     if cap.isOpened():
+                        self._warmup_opencv_capture(cap, attempt=attempt, backend_name=backend_name)
                         self._release_opencv()
                         self.cap = cap
+                        self._consecutive_read_failures = 0
                         logger.info(
                             "camera_open_ok attempt=%s index=%s backend=%s",
                             attempt,
@@ -203,6 +266,7 @@ class CameraStream:
             except Exception:
                 logger.exception("camera_release_failed")
         self.cap = None
+        self._consecutive_read_failures = 0
 
     # ── Unified interface ────────────────────────────────────────────
 
@@ -225,8 +289,12 @@ class CameraStream:
     def _apply_frame_orientation(self, frame):
         if frame is None:
             return None
+        if config.camera_flip_horizontal and config.camera_flip_vertical:
+            return cv2.flip(frame, -1)
         if config.camera_flip_horizontal:
             return cv2.flip(frame, 1)
+        if config.camera_flip_vertical:
+            return cv2.flip(frame, 0)
         return frame
 
     def _read_frame(self):
@@ -273,6 +341,7 @@ class CameraStream:
 
             ok, raw = self._read_frame()
             if ok:
+                self._consecutive_read_failures = 0
                 with self.lock:
                     encode_jpeg = self._jpeg_clients > 0
 
@@ -299,8 +368,13 @@ class CameraStream:
                         self._fps_tick_perf = frame_tick_perf
                     self.frame_cond.notify_all()
             else:
-                logger.error("camera_frame_read_failed")
-                self._release_capture()
+                self._consecutive_read_failures += 1
+                logger.error(
+                    "camera_frame_read_failed consecutive_failures=%s",
+                    self._consecutive_read_failures,
+                )
+                if self._consecutive_read_failures >= 3:
+                    self._release_capture()
                 time.sleep(self.retry_delay_sec)
                 next_tick = time.perf_counter() + min_interval
 

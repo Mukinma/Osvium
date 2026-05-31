@@ -25,6 +25,7 @@ export function createLockscreenController(deps = {}, options = {}) {
     pausePolling: deps.pausePolling || (() => true),
     resumePolling: deps.resumePolling || (() => true),
     onResetIdleDeadline: deps.onResetIdleDeadline || noop,
+    onCameraError: deps.onCameraError || noop,
     setTimeoutFn: deps.setTimeoutFn || ((fn, ms) => setTimeout(fn, ms)),
     clearTimeoutFn: deps.clearTimeoutFn || ((id) => clearTimeout(id)),
     logTransition: deps.logTransition || noop,
@@ -86,6 +87,11 @@ export function createLockscreenController(deps = {}, options = {}) {
       if (effect === EFFECTS.CLEAR_WAKE_TIMEOUT) {
         clearWakeTimeoutTimer();
       }
+
+      if (effect === EFFECTS.FORCE_UNLOCK_CAMERA_ERROR) {
+        api.hideLockscreen();
+        api.onCameraError();
+      }
     }
   }
 
@@ -101,7 +107,13 @@ export function createLockscreenController(deps = {}, options = {}) {
 
     let resumeContext;
     if (prevCtx.state === STATES.WAKING && stateChanged) {
-      resumeContext = nextCtx.state === STATES.ACTIVE_UNLOCKED ? 'ok' : 'resume_fail';
+      if (nextCtx.state !== STATES.ACTIVE_UNLOCKED) {
+        resumeContext = 'resume_fail';
+      } else if (nextCtx.effects.some((e) => e === EFFECTS.FORCE_UNLOCK_CAMERA_ERROR)) {
+        resumeContext = 'forced_unlock';
+      } else {
+        resumeContext = 'ok';
+      }
     }
 
     api.logTransition({

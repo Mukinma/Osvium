@@ -106,14 +106,23 @@
     return VIEW_META[viewId] || VIEW_META[DEFAULT_VIEW];
   }
 
+  function tr(text) {
+    try { return window.i18n?.t ? window.i18n.t(text) : text; } catch (_) { return text; }
+  }
+
   function renderChrome() {
     const meta = getViewMeta(currentView);
-    const title = chromeState.scopeViewId === currentView && chromeState.title
+    const rawTitle = chromeState.scopeViewId === currentView && chromeState.title
       ? chromeState.title
       : meta.title;
+    const title = tr(rawTitle);
 
     shell.dataset.view = currentView;
     if (viewTitle) viewTitle.textContent = title;
+  }
+
+  function getClockLocale() {
+    try { return window.i18n?.getLang() === 'en' ? 'en-US' : 'es-MX'; } catch (_) { return 'es-MX'; }
   }
 
   function updateClock() {
@@ -127,7 +136,7 @@
     });
     const nextTimeLabel = formattedTime.replace(/\./g, '').toUpperCase();
 
-    const dateParts = new Intl.DateTimeFormat('es-ES', {
+    const dateParts = new Intl.DateTimeFormat(getClockLocale(), {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -410,4 +419,10 @@
   applyResponsiveLayout();
   activateView(getHashView());
   startClock();
+
+  document.addEventListener('i18n:change', () => {
+    lastClockSignature = '';
+    updateClock();
+    renderChrome();
+  });
 })();

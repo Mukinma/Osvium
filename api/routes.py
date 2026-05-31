@@ -240,10 +240,13 @@ def status(request: Request):
     _session_required(request)
     payload = request.app.state.service.get_status()
     try:
-        payload["support_phone"] = str(db.get_config().get("support_phone") or "")
+        cfg = db.get_config()
+        payload["support_phone"] = str(cfg.get("support_phone") or "")
+        payload["door_open_seconds"] = int(cfg.get("tiempo_apertura_seg") or config.default_open_seconds)
     except Exception:
         logger.exception("status_support_phone_failed")
         payload["support_phone"] = ""
+        payload["door_open_seconds"] = config.default_open_seconds
     return payload
 
 

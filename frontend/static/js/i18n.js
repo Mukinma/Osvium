@@ -72,6 +72,8 @@
     'Análisis en curso': 'Analysis in progress',
     'Espere a que finalice el proceso actual':
       'Wait for the current process to finish',
+    'Debe salir la otra persona': 'The other person must step aside',
+    'Solo una persona frente a la cámara': 'Only one person in front of the camera',
 
     /* Badge / camera states */
     'No reconocido': 'Not recognized',
@@ -91,6 +93,7 @@
     'Error de<br>cámara': 'Camera<br>error',
     'Cargando<br>modelo': 'Loading<br>model',
     'Sin<br>modelo': 'No<br>model',
+    'Debe salir<br>la otra persona': 'Other person<br>must step aside',
 
     /* Info panel — descriptions with <br><strong> */
     'Identidad verificada<br><strong>acceso autorizado</strong>':
@@ -113,6 +116,10 @@
       'Loading model<br><strong>for recognition</strong>',
     'Entrena un modelo desde<br><strong>el panel de administración</strong>':
       'Train a model from<br><strong>the admin panel</strong>',
+    'No se pudo validar la identidad<br><strong>intenta nuevamente</strong>':
+      'Could not validate identity<br><strong>try again</strong>',
+    'La cámara detecta más de una persona<br><strong>esperando despeje</strong>':
+      'Camera detects more than one person<br><strong>waiting for clearance</strong>',
 
     /* Misc */
     'Error de conexión': 'Connection error',
@@ -252,7 +259,9 @@
     'Cargando…': 'Loading…',
     'Puerta': 'Door',
     'Mantenimiento': 'Maintenance',
-    'Traductor': 'Translator',
+    'Soporte': 'Support',
+    'Idioma': 'Language',
+    'Traductor': 'Language',
     'Cambiar idioma del sistema': 'Change system language',
     'Teclado en pantalla': 'On-screen keyboard',
     'Sistema y cuenta': 'System and account',
@@ -283,6 +292,12 @@
     'Segundos abierta': 'Seconds open',
     'Tiempo que permanece desbloqueada la puerta tras un acceso autorizado.':
       'Time the door remains unlocked after an authorized access.',
+
+    /* Admin — soporte */
+    'Centro encargado': 'Responsible center',
+    'Teléfono de ayuda': 'Help phone',
+    'Se muestra en kiosk cuando no se detecta rostro.': 'Shown in kiosk when no face is detected.',
+    'Sin teléfono': 'No phone',
 
     /* Admin — mantenimiento */
     'Acciones de mantenimiento': 'Maintenance actions',
@@ -525,7 +540,8 @@
     'rechazo(s) hoy': 'rejection(s) today',
     'Revision': 'Review',
     'Atencion inmediata': 'Immediate attention',
-    '': 'Quick access',
+    'Acceso Rápido': 'Quick access',
+    'Acceso rápido': 'Quick access',
     'Revision recomendada': 'Review recommended',
     'Sistema listo': 'System ready',
     'persona': 'person',
@@ -698,25 +714,77 @@
       'The camera is sleeping. Reactivate the system before starting.',
     'La camara no esta lista. Revisa la conexion antes de iniciar.':
       'The camera is not ready. Check the connection before starting.',
+
+    /* ── Admin — sidebar ── */
+    'Centro operativo': 'Operations center',
+    'Personas, accesos y ajustes': 'People, access and settings',
+    'Estado y actividad': 'Status and activity',
+    'Gestión y enrolamiento': 'Management and enrollment',
+    'Puerta y ajustes': 'Door and settings',
+    'Principal': 'Main',
+    'Secciones principales': 'Main sections',
+    'Utilidades': 'Utilities',
+    'Alternar navegación lateral': 'Toggle side navigation',
+
+    /* ── Admin — maintenance ── */
+    'Borrar muestras faciales': 'Delete face samples',
+    'Elimina capturas anteriores y fuerza recaptura limpia':
+      'Deletes previous captures and forces a clean recapture',
+
+    /* ── Enrollment — tips and readiness ── */
+    'Rostro visible y fondo limpio': 'Visible face and clean background',
+    'Casco permitido si no tapa ojos, nariz ni boca':
+      'Helmet allowed if it does not cover eyes, nose or mouth',
+    'Condiciones recomendadas': 'Recommended conditions',
+    'Pendiente': 'Pending',
+    'Info': 'Info',
+
+    /* ── Enrollment — capture UI ── */
+    'Colócate frente a la cámara': 'Stand in front of the camera',
+    'Rostro no visible': 'Face not visible',
+    'Mejora la iluminación': 'Improve lighting',
+    'Error en la captura': 'Capture error',
+    'Revisa la cámara e intenta de nuevo.': 'Check the camera and try again.',
+    'Repetir': 'Retry',
+    'Cámara en vivo': 'Live camera',
+    'Volver a personas': 'Back to people',
+    'Seleccionar persona': 'Select person',
+
+    /* ── Admin — runtime ── */
+    'muestras eliminadas': 'deleted samples',
+    'registros eliminados': 'deleted records',
   };
 
   /* ── Estado ── */
 
+  const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; /* 1 año */
+
   function readLang() {
+    /* 1. localStorage */
     try {
       const v = localStorage.getItem(STORAGE_KEY);
-      return SUPPORTED.includes(v) ? v : DEFAULT_LANG;
-    } catch (_) {
-      return DEFAULT_LANG;
-    }
+      if (SUPPORTED.includes(v)) return v;
+    } catch (_) { /* storage bloqueado */ }
+    /* 2. cookie — fallback para WebViews que no persisten localStorage entre páginas */
+    try {
+      const match = document.cookie.match(
+        new RegExp('(?:^|; )' + STORAGE_KEY + '=([^;]+)')
+      );
+      if (match && SUPPORTED.includes(match[1])) return match[1];
+    } catch (_) { /* cookie bloqueada */ }
+    return DEFAULT_LANG;
   }
 
   function writeLang(lang) {
     try {
       localStorage.setItem(STORAGE_KEY, lang);
-    } catch (_) {
-      /* storage bloqueado — continuar sin persistir */
-    }
+    } catch (_) { /* storage bloqueado */ }
+    /* Persistir también en cookie para que sobreviva la navegación entre páginas */
+    try {
+      document.cookie =
+        STORAGE_KEY + '=' + lang +
+        '; path=/; SameSite=Strict; max-age=' + COOKIE_MAX_AGE;
+    } catch (_) { /* cookie bloqueada */ }
   }
 
   let currentLang = readLang();
@@ -867,6 +935,9 @@
   /* ── Bootstrap ── */
 
   function boot() {
+    /* Re-leer en el momento de arranque para capturar valores escritos por
+       otras páginas después de que este módulo se inicializó. */
+    currentLang = readLang();
     document.documentElement.lang = currentLang;
     applyAll();
 

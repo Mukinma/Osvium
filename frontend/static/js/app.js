@@ -58,8 +58,11 @@ const desktopLaunchPending = isDesktopLaunchPending(window);
 let desktopReadyReleased = !desktopLaunchPending;
 
 const AUTO_TRIGGER_COOLDOWN_MS = 4000;
+const MECHANISM_BUFFER_MS = 2000;
 const SUPPORT_HELP_DELAY_MS = 10000;
 let lastAutoTriggerMs = 0;
+let postGrantedBlockUntilMs = 0;
+let prevUiStateKey = '';
 let toastTimer = null;
 let supportHelpTimer = null;
 let activeSupportPhone = '';
@@ -610,7 +613,8 @@ function updateClock() {
   });
   clockTime.textContent = formattedTime.replace(/\./g, '').toUpperCase();
 
-  const dateParts = new Intl.DateTimeFormat('es-ES', {
+  const clockLocale = window.i18n?.getLang() === 'en' ? 'en-US' : 'es-MX';
+  const dateParts = new Intl.DateTimeFormat(clockLocale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -696,6 +700,12 @@ async function loadStatus() {
     const uiState = classifyState(data);
     setSystemBadge(uiState.badge[0], uiState.badge[1]);
 
+    if (uiState.key === 'granted' && prevUiStateKey !== 'granted') {
+      const openSeconds = Number(data.door_open_seconds || 3);
+      postGrantedBlockUntilMs = Date.now() + openSeconds * 1000 + MECHANISM_BUFFER_MS;
+    }
+    prevUiStateKey = uiState.key;
+
     updateFaceIndicator(uiState.key);
     updateWelcomeOverlay(uiState.key, data);
     updatePrimaryFaceBox(data, uiState.key);
@@ -707,7 +717,7 @@ async function loadStatus() {
     const guidanceReady = data.face_guidance && data.face_guidance.ready;
     if (guidanceReady && !isScanPaused && !data.analysis_busy && faceAction && !faceAction.localBusy && faceAction.isReady(data)) {
       const now = Date.now();
-      if (now - lastAutoTriggerMs >= AUTO_TRIGGER_COOLDOWN_MS) {
+      if (now - lastAutoTriggerMs >= AUTO_TRIGGER_COOLDOWN_MS && now >= postGrantedBlockUntilMs) {
         lastAutoTriggerMs = now;
         faceAction.handleAnalyzeClick();
       }
@@ -898,6 +908,14 @@ const lockscreenController = lockscreenControllerApi?.create(
     pausePolling,
     resumePolling,
     onResetIdleDeadline: resetIdleDeadline,
+    onCameraError: () => {
+      resumeCamera('camera_error');
+      resumeScan();
+      isPollingPaused = false;
+      startStatusPolling();
+      loadStatus();
+      resetIdleDeadline();
+    },
     logTransition: (entry) => {
       console.info('[lockscreen-fsm]', { ...entry, ts: Date.now() });
     },
@@ -973,5 +991,6 @@ document.addEventListener('i18n:change', () => {
   if (badgeKey) {
     systemStateBadge.textContent = tr(badgeKey);
   }
+  updateClock();
   loadStatus();
 });
