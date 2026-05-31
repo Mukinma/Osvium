@@ -332,19 +332,54 @@ function updatePrimaryFaceBox(data, uiStateKey) {
   }
 }
 
+/* Cambia el símbolo del sprite usado por el ícono del overlay (check / x). */
+function setWelcomeIcon(symbolId) {
+  const useEl = welcomeCheckIcon?.querySelector('use');
+  if (useEl) {
+    useEl.setAttribute('href', `/static/icons/lucide/lucide-sprite.svg#${symbolId}`);
+  }
+}
+
+function hideWelcomeOverlay() {
+  welcomeOverlay.classList.add('is-hidden');
+  welcomeOverlay.classList.remove('welcome-overlay--blue', 'welcome-overlay--red');
+  welcomeCheckIcon?.classList.add('is-hidden');
+}
+
 function updateWelcomeOverlay(stateKey, data) {
   if (!welcomeOverlay || !welcomeTitle || !welcomeName) return;
-  const userName = getRecognizedUserName(data?.last_user);
-  if (stateKey !== 'granted' || !userName) {
-    welcomeOverlay.classList.add('is-hidden');
-    welcomeCheckIcon?.classList.add('is-hidden');
+
+  /* Acceso autorizado → overlay azul con el nombre del usuario reconocido. */
+  if (stateKey === 'granted') {
+    const userName = getRecognizedUserName(data?.last_user);
+    if (!userName) {
+      hideWelcomeOverlay();
+      return;
+    }
+    welcomeTitle.textContent = tr('Adelante');
+    welcomeName.textContent = userName;
+    setWelcomeIcon('circle-check');
+    welcomeCheckIcon?.classList.remove('is-hidden');
+    welcomeOverlay.classList.remove('is-hidden', 'welcome-overlay--red');
+    welcomeOverlay.classList.add('welcome-overlay--blue');
     return;
   }
-  welcomeTitle.textContent = 'Adelante';
-  welcomeName.textContent = userName;
-  welcomeCheckIcon?.classList.remove('is-hidden');
-  welcomeOverlay.classList.remove('is-hidden');
-  welcomeOverlay.classList.add('welcome-overlay--blue');
+
+  /* Acceso no autorizado (rostro no registrado o denegado) → overlay rojo,
+     contraparte exacta del azul: misma estructura, transparencia y tonos. */
+  if (stateKey === 'unrecognized' || stateKey === 'denied') {
+    welcomeTitle.textContent = tr('No autorizado');
+    welcomeName.textContent = stateKey === 'denied'
+      ? tr('Acceso denegado')
+      : tr('Persona no registrada');
+    setWelcomeIcon('circle-x');
+    welcomeCheckIcon?.classList.remove('is-hidden');
+    welcomeOverlay.classList.remove('is-hidden', 'welcome-overlay--blue');
+    welcomeOverlay.classList.add('welcome-overlay--red');
+    return;
+  }
+
+  hideWelcomeOverlay();
 }
 
 function formatAccessReceiptTime() {
@@ -971,6 +1006,18 @@ document.addEventListener('keydown', (event) => {
 
 supportHelpButton?.addEventListener('click', openSupportHelp);
 supportHelpClose?.addEventListener('click', closeSupportHelp);
+
+/* Bloqueo por exceso de taps: pausa el reconocimiento mientras el pop-up
+   está activo para que el sistema no reconozca de fondo, y lo reanuda al
+   terminar la cuenta regresiva. */
+document.addEventListener('tap-lockout:start', () => {
+  pauseScan();
+});
+document.addEventListener('tap-lockout:end', () => {
+  resumeScan();
+  lastAutoTriggerMs = Date.now();
+  loadStatus();
+});
 
 lockscreenApi?.bindTap(() => {
   lockscreenController?.dispatch({ type: LOCK_EVENTS.USER_TAP_OR_CLICK });

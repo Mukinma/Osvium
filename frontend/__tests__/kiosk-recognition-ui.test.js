@@ -117,7 +117,7 @@ function createDom(getStatus) {
   });
   window.requestAnimationFrame = (callback) => window.setTimeout(callback, 0);
   window.cancelAnimationFrame = (id) => window.clearTimeout(id);
-  window.i18n = { t: (value) => value };
+  window.i18n = { t: (value) => value, getLang: () => 'es' };
 
   global.window = window;
   global.document = window.document;
@@ -237,6 +237,32 @@ describe('kiosk recognition UI', () => {
     expect(
       dom.window.document.querySelector('#welcomeCheckIcon use')?.getAttribute('href'),
     ).toBe('/static/icons/lucide/lucide-sprite.svg#circle-check');
+  });
+
+  it('renders red unauthorized overlay for an unregistered face', async () => {
+    vi.useFakeTimers();
+    const unrecognized = baseStatus({
+      last_result: 'DENEGADO',
+      last_user: 'Desconocido',
+      timestamp: Math.floor(Date.now() / 1000),
+      face_detected: true,
+      primary_face_bbox: { x: 0.2, y: 0.2, w: 0.25, h: 0.35 },
+      faces_count: 1,
+      face_guidance: { state: 'ready', message: 'Rostro detectado', ready: true, faces_count: 1 },
+    });
+    const dom = createDom(() => unrecognized);
+
+    await importKioskApp();
+
+    const overlay = dom.window.document.getElementById('welcomeOverlay');
+    expect(overlay.classList.contains('is-hidden')).toBe(false);
+    expect(overlay.classList.contains('welcome-overlay--red')).toBe(true);
+    expect(overlay.classList.contains('welcome-overlay--blue')).toBe(false);
+    expect(dom.window.document.getElementById('welcomeTitle').textContent).toBe('No autorizado');
+    expect(dom.window.document.getElementById('welcomeName').textContent).toBe('Persona no registrada');
+    expect(
+      dom.window.document.querySelector('#welcomeCheckIcon use')?.getAttribute('href'),
+    ).toBe('/static/icons/lucide/lucide-sprite.svg#circle-x');
   });
 
   it('uses the lower panel as an access receipt without repeating the authorized name', async () => {

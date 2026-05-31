@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="csrf-token" content="{{ csrf_token | e }}" />
   <title>Osvium · Terminal de acceso biométrico</title>
   <link rel="icon" type="image/svg+xml" href="/static/images/logo-white.svg?v={{ asset_version }}" />
@@ -163,10 +163,24 @@
     </div>
   </div>
 
+  <div id="tapLockout" class="tap-lockout is-hidden" role="alertdialog" aria-modal="true"
+       aria-labelledby="tapLockoutTitle" aria-describedby="tapLockoutMessage" aria-hidden="true">
+    <div class="tap-lockout__backdrop"></div>
+    <section class="tap-lockout__panel">
+      <svg class="tap-lockout__icon" aria-hidden="true">
+        <use href="/static/icons/lucide/lucide-sprite.svg#alert-triangle"></use>
+      </svg>
+      <p class="tap-lockout__title" id="tapLockoutTitle" data-i18n>Oops, demasiados intentos</p>
+      <p class="tap-lockout__message" id="tapLockoutMessage" aria-live="assertive"></p>
+      <div class="tap-lockout__bar"><span class="tap-lockout__bar-fill" id="tapLockoutBar"></span></div>
+    </section>
+  </div>
+
   <script src="/static/js/i18n.js?v={{ asset_version }}"></script>
   <script src="/static/js/theme.js?v={{ asset_version }}"></script>
   <script src="/static/js/lockscreen.js?v={{ asset_version }}"></script>
   <script src="/static/js/face-action.js?v={{ asset_version }}"></script>
+  <script src="/static/js/tap-lockout.js?v={{ asset_version }}"></script>
   <script src="/static/js/logo-navigation.js?v={{ asset_version }}"></script>
   <script type="module" src="/static/js/lockscreen-fsm.js?v={{ asset_version }}"></script>
   <script type="module" src="/static/js/lockscreen-controller.js?v={{ asset_version }}"></script>
